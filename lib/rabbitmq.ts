@@ -14,7 +14,7 @@ class RabbitMQConnection{
         this.isConnecting = false;
     }
 
-    async connect(){
+    async connect(): Promise<Channel | null> {
         if(this.channel){
             return this.channel;
         }
@@ -78,16 +78,16 @@ class RabbitMQConnection{
         }
     }
 
-    getChannel(){
+    getChannel(): Channel | null {
         return this.channel;
     }
 
-    getStatus(): "connected" | "disconnected"{
+    getStatus(): "connected" | "disconnected" {
         if(!this.connection || !this.channel) return "disconnected";
         return "connected";
     }
 
-    async close(){
+    async close(): Promise<void> {
         try {
             if(this.channel){
                 await this.channel.close();
