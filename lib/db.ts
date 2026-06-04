@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { logger } from './logger';
 
+//singleton pattern
 const prismaClientSingleton = () => {
     const prisma = new PrismaClient({
     // Enable logging for query execution and warnings/errors
