@@ -19,6 +19,8 @@ class RabbitMQConnection{
             return this.channel;
         }
 
+        // If already connecting, wait (poll) until finished to reuse the channel
+        // This prevents duplicate connection leaks during concurrent page loads at startup
         if(this.isConnecting){
             await new Promise<void>((resolve) => {
                 const checkInterval = setInterval(() => {
