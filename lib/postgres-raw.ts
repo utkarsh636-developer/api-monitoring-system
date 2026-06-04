@@ -2,6 +2,7 @@ import pg, { Pool, QueryResult } from "pg"
 import { config } from "./config"
 import { logger } from "./logger"
 
+//singleton pattern
 export class PostgresConnection {
     private pool: Pool | null;
     
