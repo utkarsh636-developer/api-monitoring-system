@@ -105,4 +105,21 @@ class RabbitMQConnection{
     }
 }
 
-export default new RabbitMQConnection();
+// == DEVELOPMENT SINGLETON (PREVENTS LEAKS DURING NEXT.JS HMR) ==
+declare global {
+    var rabbitmqGlobalConnection: RabbitMQConnection | undefined;
+}
+
+// Check if we already created a connection manager on globalThis
+const rabbitmqConnection = globalThis.rabbitmqGlobalConnection ?? new RabbitMQConnection();
+
+export default rabbitmqConnection;
+
+// Cache the connection manager on globalThis only in development mode
+if (process.env.NODE_ENV !== 'production') {
+    globalThis.rabbitmqGlobalConnection = rabbitmqConnection;
+}
+
+// == PRODUCTION ONLY (COMMENTED OUT FOR FUTURE USE) ==
+// export default new RabbitMQConnection();
+
