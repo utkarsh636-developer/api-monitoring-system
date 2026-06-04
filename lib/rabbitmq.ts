@@ -35,6 +35,8 @@ class RabbitMQConnection{
             this.isConnecting = true;
 
             logger.info("Connecting to RabbitMQ", config.rabbitmq.url);
+
+            // Create local instance first to guarantee type-safety
             const conn = await amqp.connect(config.rabbitmq.url);
             const chan = await conn.createChannel();
 
