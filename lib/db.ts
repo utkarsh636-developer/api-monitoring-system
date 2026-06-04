@@ -10,15 +10,12 @@ class DatabaseConnection {
         this.isConnecting = false;
     }
 
-    /**
-     * Connects to PostgreSQL using Prisma and returns the PrismaClient instance
-     */
     async connect(): Promise<PrismaClient | null> {
         if (this.client) {
             return this.client;
         }
 
-        // Handle concurrent connection attempts (matching RabbitMQ/Redis logic)
+        // Handle concurrent connection attempts
         if (this.isConnecting) {
             await new Promise<void>((resolve) => {
                 const checkInterval = setInterval(() => {
@@ -76,24 +73,15 @@ class DatabaseConnection {
         }
     }
 
-    /**
-     * Returns the active Prisma Client instance
-     */
     getClient(): PrismaClient | null {
         return this.client;
     }
 
-    /**
-     * Returns database connection status
-     */
     getStatus(): "connected" | "disconnected" {
         if (!this.client) return "disconnected";
         return "connected";
     }
 
-    /**
-     * Gracefully disconnects from PostgreSQL
-     */
     async close(): Promise<void> {
         try {
             if (this.client) {
