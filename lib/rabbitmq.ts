@@ -1,0 +1,108 @@
+import amqp, { Connection, Channel, ChannelModel } from "amqplib"
+import { config } from "./config"
+import { logger } from "./logger"
+
+
+class RabbitMQConnection{
+    private connection: ChannelModel | null;
+    private channel: Channel | null;
+    private isConnecting: boolean;
+
+    constructor(){
+        this.connection = null;
+        this.channel = null;
+        this.isConnecting = false;
+    }
+
+    async connect(){
+        if(this.channel){
+            return this.channel;
+        }
+
+        if(this.isConnecting){
+            await new Promise<void>((resolve) => {
+                const checkInterval = setInterval(() => {
+                    if(!this.isConnecting){
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100)
+            })
+            return this.channel;
+        }
+
+        try {
+            this.isConnecting = true;
+
+            logger.info("Connecting to RabbitMQ", config.rabbitmq.url);
+            const conn = await amqp.connect(config.rabbitmq.url);
+            const chan = await conn.createChannel();
+
+            this.connection = conn;
+            this.channel = chan;
+
+            // Creating Key | Queue Name
+            const dlqName = `${config.rabbitmq.queue}.dlq` //api_hits.dlq
+
+            // DL Queue
+            await chan.assertQueue(dlqName, {
+                durable: true
+            })
+
+            // Normal Queue
+            await chan.assertQueue(config.rabbitmq.queue, {
+                durable: true,
+                arguments: {
+                    "x-dead-letter-exchange": "",
+                    "x-dead-letter-routing-key": dlqName
+                }
+            })
+
+            logger.info("RabbitMQ connected, queue", config.rabbitmq.queue)
+
+            conn.on('close', () => {
+                logger.warn('RabbitMQ connection closed');
+                this.connection = null;
+                this.channel = null;
+            })
+
+            this.connection = conn;
+            this.channel = chan;
+
+            this.isConnecting = false;
+            return this.channel;
+        } catch (error: any) {
+            this.isConnecting = false;
+            logger.error("Failed to connect to RabbitMQ", error);
+            throw error;
+        }
+    }
+
+    getChannel(){
+        return this.channel;
+    }
+
+    getStatus(): "connected" | "disconnected"{
+        if(!this.connection || !this.channel) return "disconnected";
+        return "connected";
+    }
+
+    async close(){
+        try {
+            if(this.channel){
+                await this.channel.close();
+                this.channel = null;
+            }
+            if(this.connection){
+                await this.connection.close();
+                this.connection = null;
+            }
+
+            logger.info("RabbitMQ connection closed");
+        } catch (error: any) {
+            logger.error("Error in closing RabbitMQ connection", error);
+        }
+    }
+}
+
+export default new RabbitMQConnection();

@@ -3,7 +3,7 @@ import { config } from "./config"
 import { logger } from "./logger"
 
 //singleton pattern
-export class PostgresConnection {
+class PostgresConnection {
     private pool: Pool | null;
     
     constructor() {
@@ -67,3 +67,5 @@ export class PostgresConnection {
         }
     }
 }
+
+export default new PostgresConnection();
