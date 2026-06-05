@@ -1,30 +1,30 @@
 import amqp, { Connection, Channel, ChannelModel } from "amqplib"
-import { config } from "./config"
+import { config } from "../config"
 import { logger } from "./logger"
 
 
-class RabbitMQConnection{
+class RabbitMQConnection {
     private connection: ChannelModel | null;
     private channel: Channel | null;
     private isConnecting: boolean;
 
-    constructor(){
+    constructor() {
         this.connection = null;
         this.channel = null;
         this.isConnecting = false;
     }
 
     async connect(): Promise<Channel | null> {
-        if(this.channel){
+        if (this.channel) {
             return this.channel;
         }
 
         // If already connecting, wait (poll) until finished to reuse the channel
         // This prevents duplicate connection leaks during concurrent page loads at startup
-        if(this.isConnecting){
+        if (this.isConnecting) {
             await new Promise<void>((resolve) => {
                 const checkInterval = setInterval(() => {
-                    if(!this.isConnecting){
+                    if (!this.isConnecting) {
                         clearInterval(checkInterval);
                         resolve();
                     }
@@ -87,17 +87,17 @@ class RabbitMQConnection{
     }
 
     getStatus(): "connected" | "disconnected" {
-        if(!this.connection || !this.channel) return "disconnected";
+        if (!this.connection || !this.channel) return "disconnected";
         return "connected";
     }
 
     async close(): Promise<void> {
         try {
-            if(this.channel){
+            if (this.channel) {
                 await this.channel.close();
                 this.channel = null;
             }
-            if(this.connection){
+            if (this.connection) {
                 await this.connection.close();
                 this.connection = null;
             }

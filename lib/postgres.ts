@@ -1,11 +1,11 @@
 import pg, { Pool, QueryResult } from "pg"
-import { config } from "./config"
+import { config } from "../config"
 import { logger } from "./logger"
 
 //singleton pattern
 class PostgresConnection {
     private pool: Pool | null;
-    
+
     constructor() {
         this.pool = null;
     }
