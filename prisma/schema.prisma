@@ -1,13 +1,248 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
-generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
-}
-
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  SUPER_ADMIN
+  CLIENT_ADMIN
+  CLIENT_VIEWER
+}
+
+enum Environment {
+  PRODUCTION
+  STAGING
+  DEVELOPMENT
+  TESTING
+}
+
+enum HttpMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+  OPTIONS
+  HEAD
+}
+
+// 1. Updated Client Model
+model Client {
+  id                String   @id @default(uuid())
+  name              String
+  slug              String   @unique
+  email             String
+  description       String?  @default("")
+  website           String?  @default("")
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Flattened settings (Better type-safety & performance)
+  dataRetentionDays Int      @default(30)
+  alertsEnabled     Boolean  @default(true)
+  timezone          String   @default("UTC")
+
+  // Relation: The User who created the client
+  createdById       String
+  creator           User     @relation("ClientCreator", fields: [createdById], references: [id])
+
+  // Relation: The users who belong to this client (members)
+  users             User[]   @relation("ClientMembers")
+
+  // Relation: API Keys associated with this client
+  apiKeys           ApiKey[]
+
+  // Relation: API Hits logged by this client
+  apiHits           ApiHit[]
+}
+
+// 2. Updated User Model
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(CLIENT_VIEWER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Toggled permissions
+  canCreateApiKeys Boolean @default(false)
+  canManageUsers   Boolean @default(false)
+  canViewAnalytics Boolean @default(true)
+  canExportData    Boolean @default(false)
+
+  // Relation: The Client/Company this user belongs to (null for SUPER_ADMIN)
+  clientId     String?
+  client       Client?  @relation("ClientMembers", fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Relation: All Clients created by this user
+  createdClients Client[] @relation("ClientCreator")
+
+  // Relation: API Keys created by this user
+  createdApiKeys ApiKey[] @relation("ApiKeyCreator")
+
+  // Relation: Monitors created by this user
+  monitors     Monitor[]
+
+  @@index([clientId, isActive])
+}
+
+// 3. Monitor Model
+model Monitor {
+  id           String        @id @default(uuid())
+  name         String
+  url          String
+  method       String        @default("GET")
+  headers      Json?         
+  body         String?       
+  interval     Int           @default(60) 
+  timeout      Int           @default(5000) 
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  checkResults CheckResult[]
+  incidents    Incident[]
+
+  @@index([userId])
+}
+
+model CheckResult {
+  id           String   @id @default(uuid())
+  monitorId    String
+  monitor      Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  timestamp    DateTime @default(now())
+  statusCode   Int?     // Status code (null on connection/network failures)
+  responseTime Int      // Latency in milliseconds
+  isUp         Boolean  // Computed up/down status
+  error        String?  // Error message (e.g., ETIMEDOUT, ENOTFOUND)
+
+  @@index([monitorId])
+  @@index([timestamp])
+}
+
+model Incident {
+  id         String    @id @default(uuid())
+  monitorId  String
+  monitor    Monitor   @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  status     String    @default("OPEN") // "OPEN" or "RESOLVED"
+  error      String?   // Root cause error that triggered the downtime
+  startedAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  @@index([monitorId])
+}
+
+// 4. The ApiKey Model
+model ApiKey {
+  id                  String      @id @default(uuid())
+  keyId               String      @unique
+  keyValue            String      @unique
+  name                String
+  description         String?     @default("")
+  environment         Environment @default(PRODUCTION)
+  isActive            Boolean     @default(true)
+  expiresAt           DateTime
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  // Permissions (Flattened)
+  canIngest           Boolean     @default(true)
+  canReadAnalytics    Boolean     @default(false)
+  allowedServices     String[]    // PostgreSQL array type
+
+  // Security (Flattened)
+  allowedIPs          String[]    // PostgreSQL array type
+  allowedOrigins      String[]    // PostgreSQL array type
+  lastRotated         DateTime    @default(now())
+  rotationWarningDays Int         @default(30)
+
+  // Metadata (Flattened)
+  purpose             String?     @default("")
+  tags                String[]    // PostgreSQL array type
+
+  // Relationship: API Key belongs to a Client (Organization)
+  clientId            String
+  client              Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Relationship: API Key is created by a User (Staff/Admin)
+  createdById         String
+  creator             User        @relation("ApiKeyCreator", fields: [createdById], references: [id])
+
+  // Relation: API Hits registered by this key
+  apiHits             ApiHit[]
+
+  // Indexes for high-speed queries
+  @@index([clientId, isActive])
+  @@index([keyValue, isActive])
+  @@index([environment, clientId])
+  @@index([expiresAt])
+}
+
+// 5. The ApiHit Model
+model ApiHit {
+  id          String     @id @default(uuid())
+  eventId     String     @unique
+  timestamp   DateTime
+  serviceName String
+  endpoint    String
+  method      HttpMethod
+  statusCode  Int
+  latencyMs   Int
+  ip          String
+  userAgent   String?    @default("")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relationship: API Hit belongs to a Client
+  clientId    String
+  client      Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Relationship: API Hit belongs to an ApiKey
+  apiKeyId    String
+  apiKey      ApiKey     @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  // Compound Indexes for fast analytics queries
+  @@index([clientId, serviceName, endpoint, timestamp])
+  @@index([clientId, timestamp, statusCode])
+  @@index([apiKeyId, timestamp])
+  @@index([timestamp])
+}
+
+// 6. The EndpointMetrics Model (Pre-aggregated rollups)
+model EndpointMetrics {
+  id          Int      @id @default(autoincrement())
+  clientId    String
+  serviceName String
+  endpoint    String
+  method      String
+  timeBucket  DateTime
+  totalHits   Int      @default(0)
+  errorHits   Int      @default(0)
+  avgLatency  Decimal  @default(0.000) @db.Decimal(10, 3)
+  minLatency  Decimal  @default(0.000) @db.Decimal(10, 3)
+  maxLatency  Decimal  @default(0.000) @db.Decimal(10, 3)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt // Auto-updates timestamp (replaces SQL triggers!)
+
+  // The unique constraint that enables "Upsert" (conflict updates)
+  @@unique([clientId, serviceName, endpoint, method, timeBucket])
+
+  // Indexes for high-speed charts queries
+  @@index([clientId])
+  @@index([clientId, serviceName])
+  @@index([timeBucket])
+  @@index([clientId, serviceName, endpoint])
+}
+
+
