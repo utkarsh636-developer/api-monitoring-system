@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import { config } from './config';
+import { config } from '../config';
 import { logger } from './logger';
 
 class RedisConnection {
@@ -48,7 +48,7 @@ class RedisConnection {
 
             this.client = redisInstance;
             this.isConnecting = false;
-            
+
             return this.client;
         } catch (error: any) {
             this.isConnecting = false;
