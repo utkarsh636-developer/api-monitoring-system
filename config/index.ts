@@ -24,7 +24,7 @@ export const config = {
     },
 
     rateLimit: {
-        windowsMs: parseInt(process.env.RATE_LIMIT_WINDOWS_MS || '900000', 10),
+        windowsMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
         maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000', 10),
     },
 
