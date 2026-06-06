@@ -53,6 +53,7 @@ class PostgresConnection {
             const result = await pool.query(text, params);
             const duration = Date.now() - start;
             logger.debug('Executed query', { text, duration, rows: result.rowCount });
+            return result;
         } catch (error: any) {
             logger.error('Query error:', { text, error: error.message });
             throw error
