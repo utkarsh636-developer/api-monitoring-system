@@ -1,4 +1,4 @@
-export const config = {
+const config = {
     node_env: process.env.NODE_ENV || 'development',
     port: parseInt(process.env.PORT || '5000', 10),
 
@@ -36,3 +36,5 @@ export const config = {
         db: parseInt(process.env.REDIS_DB || '0', 10),
     }
 }
+
+export default config;
