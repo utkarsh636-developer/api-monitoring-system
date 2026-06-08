@@ -85,8 +85,50 @@ async function startServer() {
             logger.info(`Environment: ${config.node_env}`);
             logger.info(`API available at: http://localhost:${config.port}`);
         });
+
+        const gracefulShutdown = async (signal: string) => {
+            logger.info(`${signal} received, shutting down gracefully...`);
+
+            server.close(async () => {
+                logger.info("HTTP server closed");
+
+                try {
+                    await prisma.close();
+                    await rabbitmq.close();
+                    logger.info('All connections closed, exiting process');
+                    process.exit(0);
+                } 
+                catch (error) {
+                    logger.error('Error during shutdown:', error);
+                    process.exit(1);
+                }
+            })
+
+            setTimeout(() => {
+                logger.error("Forced shutdown")
+                process.exit(1);
+            }, 10000);
+
+        }
+
+        process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+        process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+        // Handle uncaught exceptions
+        process.on('uncaughtException', (error: unknown) => {
+            logger.error('Uncaught Exception:', error);
+            gracefulShutdown('uncaughtException');
+        });
+
+        process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+            logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+            gracefulShutdown('unhandledRejection');
+        });
     }
     catch(error: unknown) {
-
+        logger.error('Failed to start server:', error);
+        process.exit(1);
     }
 }
+
+startServer()
