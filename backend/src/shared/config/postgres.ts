@@ -1,5 +1,5 @@
 import pg, { Pool, QueryResult } from "pg"
-import { config } from "../config"
+import { config } from "./index"
 import { logger } from "./logger"
 
 //singleton pattern

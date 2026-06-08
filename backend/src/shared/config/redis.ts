@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import { config } from '../config';
+import { config } from './index';
 import { logger } from './logger';
 
 class RedisConnection {
