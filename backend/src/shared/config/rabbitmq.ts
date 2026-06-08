@@ -1,5 +1,5 @@
 import amqp, { Connection, Channel, ChannelModel } from "amqplib"
-import { config } from "../config"
+import { config } from "./index"
 import { logger } from "./logger"
 
 

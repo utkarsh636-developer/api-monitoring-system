@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { logger } from "../lib/logger"
+import { logger } from "../config/logger"
 import { ResponseFormatter } from "../utils/responseFormatter"
 import { Prisma } from "@prisma/client"
 
