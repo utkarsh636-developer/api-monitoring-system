@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { logger } from './logger';
+import logger from './logger';
 
 class DatabaseConnection {
     private client: PrismaClient | null;

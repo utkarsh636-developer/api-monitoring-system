@@ -1,6 +1,6 @@
 import pg, { Pool, QueryResult } from "pg"
-import { config } from "./index"
-import { logger } from "./logger"
+import config from "./index"
+import logger from "./logger"
 
 //singleton pattern
 class PostgresConnection {

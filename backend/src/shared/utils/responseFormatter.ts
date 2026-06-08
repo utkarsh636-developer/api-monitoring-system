@@ -1,4 +1,4 @@
-export interface ApiResponse<T = any> {
+interface ApiResponse<T = any> {
     success: boolean;
     message?: string;
     data?: T | null;
@@ -58,3 +58,5 @@ export class ResponseFormatter{
         }
     }
 }
+
+export default ResponseFormatter;

@@ -1,6 +1,6 @@
 import Redis from 'ioredis';
-import { config } from './index';
-import { logger } from './logger';
+import config from './index';
+import logger from './logger';
 
 class RedisConnection {
     private client: Redis | null;
