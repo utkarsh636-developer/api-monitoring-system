@@ -60,3 +60,33 @@ app.use((req: Request, res: Response) => {
 })
 
 app.use(errorHandler);
+
+async function initializeConnection() {
+    try {
+        logger.info("Initializing database connections...");
+
+        await prisma.connect();
+
+        await rabbitmq.connect();
+
+        logger.info("All connections established successfully");
+    } catch (error) {
+        logger.error("Failed to initialize connections:", error);
+        throw error;
+    }
+}
+
+async function startServer() {
+    try {
+        await initializeConnection();
+
+        const server = app.listen(config.port, () => {
+            logger.info(`Server started on port ${config.port}`);
+            logger.info(`Environment: ${config.node_env}`);
+            logger.info(`API available at: http://localhost:${config.port}`);
+        });
+    }
+    catch(error: unknown) {
+
+    }
+}
