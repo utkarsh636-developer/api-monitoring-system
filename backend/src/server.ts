@@ -37,7 +37,7 @@ app.get('/health', (req: Request, res: Response) => {
     );
 });
 
-app.use('/', (req: Request, res: Response) => {
+app.get('/', (req: Request, res: Response) => {
     res.status(200).json(
         ResponseFormatter.success(
             {
@@ -55,6 +55,11 @@ app.use('/', (req: Request, res: Response) => {
     );
 });
 
+// app.use("/api/auth", authRouter);
+// app.use("/api/hit", ingestRouter);
+// app.use("/api/analytics", analyticsRouter)
+// app.use("/api", clientRouter)
+
 app.use((req: Request, res: Response) => {
     res.status(404).json(ResponseFormatter.error("Endpoint not found", 404));
 })
@@ -66,7 +71,7 @@ async function initializeConnection() {
         logger.info("Initializing database connections...");
 
         await prisma.connect();
-
+        await redis.connect()
         await rabbitmq.connect();
 
         logger.info("All connections established successfully");
@@ -95,6 +100,7 @@ async function startServer() {
                 try {
                     await prisma.close();
                     await rabbitmq.close();
+                    await redis.close()
                     logger.info('All connections closed, exiting process');
                     process.exit(0);
                 } 
