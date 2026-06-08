@@ -8,4 +8,5 @@ import redis from "./shared/config/redis";
 import rabbitmq from "./shared/config/rabbitmq";
 import errorHandler from "./shared/middlewares/errorHandler"
 import ResponseFormatter from "./shared/utils/responseFormatter"
+import dbConnection from "./shared/config/prisma"; 
 
