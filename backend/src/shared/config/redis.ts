@@ -50,7 +50,7 @@ class RedisConnection {
             this.isConnecting = false;
 
             return this.client;
-        } catch (error: any) {
+        } catch (error: unknown) {
             this.isConnecting = false;
             logger.error("Failed to connect to Redis", error);
             throw error;
@@ -74,7 +74,7 @@ class RedisConnection {
                 this.client = null;
                 logger.info("Redis connection closed");
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error("Error in closing Redis connection", error);
         }
     }

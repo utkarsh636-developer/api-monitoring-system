@@ -75,7 +75,7 @@ async function initializeConnection() {
         await rabbitmq.connect();
 
         logger.info("All connections established successfully");
-    } catch (error) {
+    } catch (error: unknown) {
         logger.error("Failed to initialize connections:", error);
         throw error;
     }
@@ -104,7 +104,7 @@ async function startServer() {
                     logger.info('All connections closed, exiting process');
                     process.exit(0);
                 } 
-                catch (error) {
+                catch (error: unknown) {
                     logger.error('Error during shutdown:', error);
                     process.exit(1);
                 }

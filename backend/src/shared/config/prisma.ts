@@ -66,7 +66,7 @@ class DatabaseConnection {
             logger.info("Database connected successfully via Prisma");
 
             return this.client;
-        } catch (error: any) {
+        } catch (error: unknown) {
             this.isConnecting = false;
             logger.error("Failed to connect to Database via Prisma", error);
             throw error;
@@ -89,7 +89,7 @@ class DatabaseConnection {
                 this.client = null;
                 logger.info("Database connection closed");
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error("Error in closing Database connection", error);
         }
     }

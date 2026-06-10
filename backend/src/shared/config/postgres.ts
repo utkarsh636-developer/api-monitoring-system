@@ -40,7 +40,7 @@ class PostgresConnection {
             client.release();
 
             logger.info(`PG connected successfully at ${result.rows[0].now}`);
-        } catch (error) {
+        } catch (error: unknown) {
             logger.error("Failed to connect to PG", error);
             throw error
         }
@@ -54,9 +54,10 @@ class PostgresConnection {
             const duration = Date.now() - start;
             logger.debug('Executed query', { text, duration, rows: result.rowCount });
             return result;
-        } catch (error: any) {
-            logger.error('Query error:', { text, error: error.message });
-            throw error
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            logger.error('Query error:', { text, error: errorMessage });
+            throw error;
         }
     }
 
