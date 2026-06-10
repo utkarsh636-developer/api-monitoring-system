@@ -75,7 +75,7 @@ class RabbitMQConnection {
 
             this.isConnecting = false;
             return this.channel;
-        } catch (error: any) {
+        } catch (error: unknown) {
             this.isConnecting = false;
             logger.error("Failed to connect to RabbitMQ", error);
             throw error;
@@ -103,7 +103,7 @@ class RabbitMQConnection {
             }
 
             logger.info("RabbitMQ connection closed");
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error("Error in closing RabbitMQ connection", error);
         }
     }
