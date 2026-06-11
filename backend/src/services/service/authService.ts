@@ -3,11 +3,12 @@ import config from "../../shared/config/index";
 import logger from "../../shared/config/logger";
 import AppError from "../../shared/utils/AppError";
 import { User, Prisma, Role } from "@prisma/client";
+import { UserRepository } from "../repository/UserRepository";
 
 export class AuthService {
-    private userRepository: any;
+    private userRepository: UserRepository;
 
-    constructor(userRepository: any) {
+    constructor(userRepository: UserRepository) {
         if (!userRepository) {
             throw new Error("UserRepository is Required");
         }
@@ -46,7 +47,6 @@ export class AuthService {
                 throw new AppError("Super admin onboarding is disabled", 403);
             }
 
-            // Force the role to be SUPER_ADMIN for onboarding
             const data = {
                 ...superAdminData,
                 role: Role.SUPER_ADMIN
