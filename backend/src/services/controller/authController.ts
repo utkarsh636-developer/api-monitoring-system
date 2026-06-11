@@ -2,11 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import config from "../../shared/config/index";
 import { APPLICATION_ROLES } from "../../shared/constants/roles";
 import ResponseFormatter from "../../shared/utils/responseFormatter";
+import { AuthService } from "../service/authService";
 
 export class AuthController {
-    private authService: any;
+    private authService: AuthService;
 
-    constructor(authService: any) {
+    constructor(authService: AuthService) {
         if (!authService) {
             throw new Error("authService is Required");
         }
@@ -24,8 +25,6 @@ export class AuthController {
                 role: APPLICATION_ROLES.SUPER_ADMIN
             };
 
-            // Cast as any for now because we will update the service layer's input structure 
-            // to accept the plain password and hash it before saving.
             const { token, user } = await this.authService.onboardSuperAdmin(superAdminData as any);
 
             res.cookie("authToken", token, {
