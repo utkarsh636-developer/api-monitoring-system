@@ -1,27 +1,24 @@
-export default class BaseRepository {
+/**
+ * BaseRepository serves as an abstract class that defines the structure for repository classes.
+ * It uses generics:
+ * - T: The model type (e.g. User, Client)
+ * - TCreateInput: The database input structure for creation (e.g. Prisma.UserCreateInput)
+ */
+export default abstract class BaseRepository<T, TCreateInput = any> {
     protected model: any;
 
     constructor(model: any) {
         this.model = model;
     }
 
-    async create(data: any): Promise<any> {
-        throw new Error("Method not implemented");
-    }
+    // Abstract methods have no body. Subclasses MUST implement them.
+    abstract create(data: TCreateInput): Promise<T>;
 
-    async findById(id: string): Promise<any> {
-        throw new Error('Method not implemented');
-    }
+    abstract findById(id: string): Promise<T | null>;
 
-    async findByUsername(username: string): Promise<any> {
-        throw new Error('Method not implemented');
-    }
+    abstract findByUsername(username: string): Promise<T | null>;
 
-    async findByEmail(email: string): Promise<any> {
-        throw new Error('Method not implemented');
-    }
+    abstract findByEmail(email: string): Promise<T | null>;
 
-    async findAll(): Promise<any[]> {
-        throw new Error('Method not implemented');
-    }
+    abstract findAll(): Promise<T[]>;
 }
