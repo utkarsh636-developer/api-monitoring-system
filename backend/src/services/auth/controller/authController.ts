@@ -80,4 +80,23 @@ export class AuthController {
         }
     }
 
+    async getProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const userId = req.user!.userId;
+            const result = await this.authService.getProfile(userId);
+            res.status(200).json(ResponseFormatter.success(result, "Profile fetched successfully", 200));
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            res.clearCookie("authToken");
+            res.status(200).json(ResponseFormatter.success({}, "Logout successful", 200));
+        } catch (error) {
+            next(error);
+        }
+    }
+
 }
