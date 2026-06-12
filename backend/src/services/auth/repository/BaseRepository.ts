@@ -5,11 +5,9 @@
  * - TCreateInput: The database input structure for creation (e.g. Prisma.UserCreateInput)
  */
 export default abstract class BaseRepository<T, TCreateInput = any> {
-    protected model: any;
+    protected abstract get model(): any;
 
-    constructor(model: any) {
-        this.model = model;
-    }
+    constructor() {}
 
     // Abstract methods have no body. Subclasses MUST implement them.
     abstract create(data: TCreateInput): Promise<T>;
