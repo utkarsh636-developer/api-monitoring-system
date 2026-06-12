@@ -1,7 +1,7 @@
 import { User, Prisma, Role } from '@prisma/client';
 import BaseRepository from './BaseRepository';
-import dbConnection from '../../shared/config/prisma';
-import logger from '../../shared/config/logger';
+import dbConnection from '../../../shared/config/prisma';
+import logger from '../../../shared/config/logger';
 
 export class UserRepository extends BaseRepository<User, Prisma.UserCreateInput> {
     constructor() {
@@ -16,7 +16,7 @@ export class UserRepository extends BaseRepository<User, Prisma.UserCreateInput>
     async create(userData: Prisma.UserCreateInput): Promise<User> {
         try {
             const data = { ...userData };
-            
+
             // 1. Prisma uses uppercase enums: Role.SUPER_ADMIN instead of 'super_admin'
             // 2. We set the flattened permission fields directly on the object
             if (data.role === Role.SUPER_ADMIN) {
