@@ -6,13 +6,21 @@ import logger from "./shared/config/logger";
 import prisma from "./shared/config/prisma";
 import redis from "./shared/config/redis";
 import rabbitmq from "./shared/config/rabbitmq";
-import errorHandler from "./shared/middlewares/errorHandler"
-import ResponseFormatter from "./shared/utils/responseFormatter"
+import errorHandler from "./shared/middlewares/errorHandler";
+import ResponseFormatter from "./shared/utils/responseFormatter";
+import cookieParser from 'cookie-parser';
+
+// Routers
+import authRouter from './services/auth/routes/authRouter';
 
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+    origin: true,
+    credentials: true,
+}));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -55,7 +63,7 @@ app.get('/', (req: Request, res: Response) => {
     );
 });
 
-// app.use("/api/auth", authRouter);
+app.use("/api/auth", authRouter);
 // app.use("/api/hit", ingestRouter);
 // app.use("/api/analytics", analyticsRouter)
 // app.use("/api", clientRouter)
