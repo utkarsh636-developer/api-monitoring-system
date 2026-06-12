@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import config from "../../shared/config/index";
-import { APPLICATION_ROLES } from "../../shared/constants/roles";
-import ResponseFormatter from "../../shared/utils/responseFormatter";
+import config from "../../../shared/config/index";
+import { APPLICATION_ROLES } from "../../../shared/constants/roles";
+import ResponseFormatter from "../../../shared/utils/responseFormatter";
 import { AuthService } from "../service/authService";
 
 export class AuthController {

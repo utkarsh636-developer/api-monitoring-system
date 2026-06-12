@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
-import config from "../../shared/config/index";
-import logger from "../../shared/config/logger";
-import AppError from "../../shared/utils/AppError";
+import config from "../../../shared/config/index";
+import logger from "../../../shared/config/logger";
+import AppError from "../../../shared/utils/AppError";
 import { User, Prisma, Role } from "@prisma/client";
 import { UserRepository } from "../repository/UserRepository";
 
