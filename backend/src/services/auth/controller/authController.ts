@@ -38,4 +38,29 @@ export class AuthController {
             next(error);
         }
     }
+
+    async register(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const { username, email, password, role } = req.body;
+            const userData = {
+                username, 
+                email, 
+                password, 
+                role: role || APPLICATION_ROLES.CLIENT_VIEWER
+            };
+
+            const { token, user } = await this.authService.register(userData as any);
+
+            res.cookie("authToken", token, {
+                httpOnly: config.cookie.httpOnly,
+                secure: config.cookie.secure,
+                maxAge: config.cookie.expiresIn
+            });
+
+            res.status(201).json(ResponseFormatter.success(user, "User created successfully", 201));
+        } catch (error) {
+            next(error);
+        }
+    }
+
 }
