@@ -142,4 +142,17 @@ export class AuthService {
         }
     }
 
+    async getProfile(userId: string): Promise<Omit<User, 'passwordHash'>> {
+        try {
+            const user = await this.userRepository.findById(userId);
+            if (!user) {
+                throw new AppError('User not found', 404);
+            }
+            return this.formatUserForResponse(user);
+        } catch (error: unknown) {
+            logger.error('Error getting user profile:', error);
+            throw error;
+        }
+    }
+
 }
