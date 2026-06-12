@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 import config from "../../../shared/config/index";
 import logger from "../../../shared/config/logger";
 import AppError from "../../../shared/utils/AppError";
@@ -36,6 +37,11 @@ export class AuthService {
         delete (userObj as any).passwordHash;
         return userObj;
     }
+
+    async comparePassword(userEnteredPassword: string, hashedPassword: string): Promise<boolean> {
+        return await bcrypt.compare(userEnteredPassword, hashedPassword);
+    }
+
 
     async onboardSuperAdmin(
         superAdminData: Prisma.UserCreateInput
@@ -96,6 +102,42 @@ export class AuthService {
             };
         } catch (error: unknown) {
             logger.error("Error in Register service", error);
+            throw error;
+        }
+    }
+
+    async login(
+        username: string, 
+        password: string
+    ): Promise<{ user: Omit<User, 'passwordHash'>; token: string }> {
+        try {
+            const user = await this.userRepository.findByUsername(username);
+
+            if (!user) {
+                throw new AppError("Invalid Credentials", 401);
+            }
+
+            if (!user.isActive) {
+                throw new AppError("Account is deactivated", 403);
+            }
+
+            // Since Prisma's model uses 'passwordHash' instead of 'password', 
+            // we use 'user.passwordHash' here.
+            const isPasswordValid = await this.comparePassword(password, user.passwordHash);
+            if (!isPasswordValid) {
+                throw new AppError("Invalid Credentials", 401);
+            }
+            
+            const token = this.generateToken(user);
+
+            logger.info("User loggedIn successfully", { username: user.username });
+
+            return {
+                user: this.formatUserForResponse(user),
+                token
+            };
+        } catch (error: unknown) {
+            logger.error("Error in Login service", error);
             throw error;
         }
     }
