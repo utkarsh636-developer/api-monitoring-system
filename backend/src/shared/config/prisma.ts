@@ -1,12 +1,17 @@
 import { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 import logger from './logger';
+import config from './index';
 
 class DatabaseConnection {
     private client: PrismaClient | null;
+    private pool: Pool | null;
     private isConnecting: boolean;
 
     constructor() {
         this.client = null;
+        this.pool = null;
         this.isConnecting = false;
     }
 
@@ -32,8 +37,15 @@ class DatabaseConnection {
             this.isConnecting = true;
             logger.info("Initializing database connection...");
 
+            const connectionString = process.env.DATABASE_URL || 
+                `postgresql://${config.postgres.user}:${encodeURIComponent(config.postgres.password)}@${config.postgres.host}:${config.postgres.port}/${config.postgres.database}?schema=public`;
+            
+            this.pool = new Pool({ connectionString });
+            const adapter = new PrismaPg(this.pool);
+
             // Create a new PrismaClient instance
             const prismaInstance = new PrismaClient({
+                adapter,
                 log: [
                     { emit: 'event', level: 'query' },
                     { emit: 'event', level: 'info' },
@@ -87,8 +99,12 @@ class DatabaseConnection {
             if (this.client) {
                 await this.client.$disconnect();
                 this.client = null;
-                logger.info("Database connection closed");
             }
+            if (this.pool) {
+                await this.pool.end();
+                this.pool = null;
+            }
+            logger.info("Database connection closed");
         } catch (error: unknown) {
             logger.error("Error in closing Database connection", error);
         }

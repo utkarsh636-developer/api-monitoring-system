@@ -5,13 +5,17 @@ import logger from '../../../shared/config/logger';
 
 export class UserRepository extends BaseRepository<User, Prisma.UserCreateInput> {
     constructor() {
+        super();
+    }
+
+    protected get model(): any {
         const client = dbConnection.getClient();
         if (!client) {
             throw new Error("Database client has not been initialized");
         }
-        // Pass the Prisma 'user' model delegate to the parent class
-        super(client.user);
+        return client.user;
     }
+
 
     async create(userData: Prisma.UserCreateInput): Promise<User> {
         try {
