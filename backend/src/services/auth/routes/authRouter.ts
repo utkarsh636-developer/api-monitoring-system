@@ -17,4 +17,13 @@ router.post("/onboard-super-admin",
     (req: Request, res: Response, next: NextFunction) => authController.onboardSuperAdmin(req, res, next)
 );
 
+router.post("/register",
+    requestLogger,
+    authenticate,
+    authorize([APPLICATION_ROLES.SUPER_ADMIN]),
+    validate(registrationSchema),
+    (req: Request, res: Response, next: NextFunction) => authController.register(req, res, next)
+);
+
+
 export default router;
