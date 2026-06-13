@@ -155,4 +155,18 @@ export class AuthService {
         }
     }
 
+    async checkSuperAdminPermissions(userId: string): Promise<boolean> {
+        try {
+            const user = await this.userRepository.findById(userId);
+            if (!user) {
+                throw new AppError("User not found", 404);
+            }
+
+            return user.role === Role.SUPER_ADMIN; 
+        } catch (error: unknown) {
+            logger.error("Error in checking super admin permissions", error);
+            throw error;
+        }
+    }
+
 }
