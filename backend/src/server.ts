@@ -12,6 +12,7 @@ import cookieParser from 'cookie-parser';
 
 // Routers
 import authRouter from './services/auth/routes/authRouter';
+import clientRouter from './services/client/routes/clientRouter'
 
 const app = express();
 
@@ -64,9 +65,9 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api", clientRouter)
 // app.use("/api/hit", ingestRouter);
 // app.use("/api/analytics", analyticsRouter)
-// app.use("/api", clientRouter)
 
 app.use((req: Request, res: Response) => {
     res.status(404).json(ResponseFormatter.error("Endpoint not found", 404));
