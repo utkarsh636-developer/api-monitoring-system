@@ -12,4 +12,9 @@ router.post("/admin/clients/onboard", (req: Request, res: Response, next: NextFu
     clientController.createClient(req, res, next)
 );
 
+router.post("/admin/clients/:clientId/users", (req: Request, res: Response, next: NextFunction) => 
+    clientController.createClientUser(req, res, next)
+);
+
+
 export default router;
