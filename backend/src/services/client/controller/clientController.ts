@@ -35,4 +35,15 @@ export class ClientController {
             next(error);
         }
     }
+
+    async createClientUser(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
+        try {
+            const { clientId } = req.params;
+            const user = await this.clientService.createClientUser(clientId, req.body, req.user!);
+            return res.status(201).json(ResponseFormatter.success(user, "Client user created successfully", 201));
+        } catch (error) {
+            next(error);
+        }
+    }
+
 }
