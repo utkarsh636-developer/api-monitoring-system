@@ -44,7 +44,7 @@ export class AuthService {
 
 
     async onboardSuperAdmin(
-        superAdminData: Prisma.UserCreateInput
+        superAdminData: { username: string; email: string; password?: string }
     ): Promise<{ user: Omit<User, 'passwordHash'>; token: string }> {
         try {
             const existingUsers = await this.userRepository.findAll();
@@ -53,8 +53,17 @@ export class AuthService {
                 throw new AppError("Super admin onboarding is disabled", 403);
             }
 
-            const data = {
-                ...superAdminData,
+            const { username, email, password } = superAdminData;
+            if (!password) {
+                throw new AppError("Password is required", 400);
+            }
+            
+            const passwordHash = await bcrypt.hash(password, 10);
+
+            const data: Prisma.UserCreateInput = {
+                username,
+                email,
+                passwordHash,
                 role: Role.SUPER_ADMIN
             };
 
