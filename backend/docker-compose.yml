@@ -25,7 +25,7 @@ services:
   redis:
     image: redis:alpine
     container_name: api-monitoring-redis
-    command: redis-server --requirepass utk_redis_password
+    command: redis-server --requirepass ${REDIS_PASSWORD:-utk_redis_password}
     ports:
       - "6379:6379"
     volumes:
@@ -39,7 +39,7 @@ services:
     container_name: api-monitoring-rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: api_user
-      RABBITMQ_DEFAULT_PASS: utk_rabbitmq_password
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-utk_rabbitmq_password}
       RABBITMQ_DEFAULT_VHOST: api_monitoring
     ports:
       - "5672:5672" # AMQP port
