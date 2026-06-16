@@ -1,5 +1,6 @@
-import { User, Prisma, Client, Role } from '@prisma/client';
+import { User, Prisma, Client, Role, ApiKey, Environment } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import BaseClientRepository from '../repository/baseClientRepository';
 import BaseApiKeyRepository from '../repository/baseApiKeyRepository';
 import BaseRepository from '../../auth/repository/BaseRepository';
@@ -161,6 +162,63 @@ export class ClientService {
             return this.formatClientForResponse(user);
         } catch (error: unknown) {
             logger.error("Error creating client user", error);
+            throw error;
+        }
+    }
+
+    generateApiKey(): string {
+        const prefix = "apim";
+        const randomBytes = crypto.randomBytes(20).toString("hex");
+        return `${prefix}_${randomBytes}`;
+    }
+
+    async createApiKey(
+        clientId: string,
+        keyData: { name: string; description?: string | null; environment?: Environment; expiresAt?: string | Date },
+        user: { userId: string; role: string; clientId?: string | null }
+    ): Promise<ApiKey> {
+        try {
+            const client = await this.clientRepository.findById(clientId);
+
+            if (!client) {
+                throw new AppError("Client not found", 404);
+            }
+
+            if (!this.canUserAccessClient(user, clientId)) {
+                throw new AppError("Access denied", 403);
+            }
+
+            if (!(user.role === Role.SUPER_ADMIN || user.role === Role.CLIENT_ADMIN)) {
+                throw new AppError("Access denied - Only Super Admin and Client Admin can create API keys", 403);
+            }
+
+            const { name, description, environment = Environment.PRODUCTION, expiresAt } = keyData;
+
+            const keyId = crypto.randomUUID();
+            const keyValue = this.generateApiKey();
+
+            const expirationDate = expiresAt 
+                ? new Date(expiresAt) 
+                : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+
+            const apiKey = await this.apiKeyRepository.create({
+                keyId,
+                keyValue,
+                name,
+                description: description || "",
+                environment,
+                expiresAt: expirationDate,
+                client: {
+                    connect: { id: clientId }
+                },
+                creator: {
+                    connect: { id: user.userId }
+                }
+            });
+
+            return apiKey;
+        } catch (error) {
+            logger.error("Error creating API key", error);
             throw error;
         }
     }

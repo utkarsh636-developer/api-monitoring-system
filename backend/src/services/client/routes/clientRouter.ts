@@ -16,5 +16,8 @@ router.post("/admin/clients/:clientId/users", (req: Request, res: Response, next
     clientController.createClientUser(req, res, next)
 );
 
+router.post("/admin/clients/:clientId/api/keys", (req: Request, res: Response, next: NextFunction) => 
+    clientController.createApiKey(req, res, next)
+);
 
 export default router;

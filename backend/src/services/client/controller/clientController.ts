@@ -46,4 +46,14 @@ export class ClientController {
         }
     }
 
+    async createApiKey(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
+        try {
+            const { clientId } = req.params;
+            const apiKey = await this.clientService.createApiKey(clientId, req.body, req.user!);
+            return res.status(201).json(ResponseFormatter.success(apiKey, "API key created successfully", 201));
+        } catch (error) {
+            next(error);
+        }
+    }
+  
 }
