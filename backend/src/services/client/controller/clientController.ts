@@ -55,5 +55,15 @@ export class ClientController {
             next(error);
         }
     }
+
+    async getClientApiKeys(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
+        try {
+            const { clientId } = req.params;
+            const apiKeys = await this.clientService.getClientApiKeys(clientId, req.user!);
+            return res.status(200).json(ResponseFormatter.success(apiKeys, "API keys fetched successfully", 200));
+        } catch (error) {
+            next(error);
+        }
+    }
   
 }

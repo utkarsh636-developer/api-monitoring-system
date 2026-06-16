@@ -223,4 +223,27 @@ export class ClientService {
         }
     }
 
+    async getClientApiKeys(
+        clientId: string,
+        user: { role: string; clientId?: string | null }
+    ): Promise<Omit<ApiKey, 'keyValue'>[]> {
+        try {
+            if (!this.canUserAccessClient(user, clientId)) {
+                throw new AppError('Access denied to this client', 403);
+            }
+
+            const apiKeys = await this.apiKeyRepository.findByClientId(clientId);
+
+            const formattedResponse = apiKeys.map(key => {
+                const { keyValue, ...keyWithoutValue } = key;
+                return keyWithoutValue;
+            });
+
+            return formattedResponse;
+        } catch (error) {
+            logger.error('Error getting client API keys:', error);
+            throw error;
+        }
+    }
+
 }

@@ -20,4 +20,8 @@ router.post("/admin/clients/:clientId/api/keys", (req: Request, res: Response, n
     clientController.createApiKey(req, res, next)
 );
 
+router.get("/admin/clients/:clientId/api/keys", (req: Request, res: Response, next: NextFunction) => 
+    clientController.getClientApiKeys(req, res, next)
+);
+
 export default router;
