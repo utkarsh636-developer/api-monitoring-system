@@ -3,6 +3,7 @@ import { isRetryable } from "./retryStrategy";
 import { ConfirmChannelManager } from "./confirmChannnelManager";
 import { CircuitBreaker } from "./circuitBreaker";
 import { RetryStrategy } from "./retryStrategy";
+import { Options } from "amqplib";
 
 export interface EventProducerOptions {
     channelManager: ConfirmChannelManager;
@@ -56,4 +57,58 @@ export class EventProducer {
     private incrementMetric(metric: keyof EventProducerMetrics): void {
         this.metrics[metric] = (this.metrics[metric] || 0) + 1;
     }
+
+    private async publish(
+        eventData: { eventId: string; [key: string]: any },
+        meta: { correlationId: string; attempt: number }
+    ): Promise<void> {
+        const { correlationId, attempt } = meta;
+        const channel = await this.channelManager.getChannel();
+
+        const message = {
+            type: EVENT_TYPES.API_HIT,
+            data: eventData,
+            publishedAt: new Date().toISOString(),
+            attempt: attempt + 1
+        };
+
+        const buffer = Buffer.from(JSON.stringify(message));
+
+        const publishOptions: Options.Publish = {
+            persistent: true,
+            contentType: 'application/json',
+            messageId: eventData.eventId,
+            correlationId,
+            timestamp: Math.floor(Date.now() / 1000)
+        };
+
+        return new Promise<void>((resolve, reject) => {
+            const written = channel.publish(
+                '',
+                this.queueName,
+                buffer,
+                publishOptions,
+                (err) => {
+                    if (err) return reject(new Error(`Publish nacked: ${err.message}`));
+                    resolve();
+                }
+            );
+
+            if (!written) {
+                this.logger.info('[EventProducer] back-pressure detected, waiting for drain', {
+                    eventId: eventData.eventId,
+                });
+            }
+
+            const onDrain = () => {
+                channel.removeListener('drain', onDrain);
+                this.logger.debug('[EventProducer] drain event received', {
+                    eventId: eventData.eventId,
+                });
+            };
+
+            channel.once("drain", onDrain);
+        });
+    }
+
 }
