@@ -16,11 +16,11 @@ export interface ConfirmChannelManagerOptions {
 }
 
 export class ConfirmChannelManager extends EventEmitter {
-    private _rabbitmq: any;
-    private _logger: NonNullable<ConfirmChannelManagerOptions['logger']>;
-    private _channel: ConfirmChannel | null;
-    private _connecting: boolean;
-    private _connectWaiters: ConnectWaiter[];
+    private rabbitmq: any;
+    private logger: NonNullable<ConfirmChannelManagerOptions['logger']>;
+    private channel: ConfirmChannel | null;
+    private connecting: boolean;
+    private connectWaiters: ConnectWaiter[];
 
     constructor({ rabbitmq, logger }: ConfirmChannelManagerOptions) {
         super();
@@ -29,19 +29,19 @@ export class ConfirmChannelManager extends EventEmitter {
             throw new Error("Confirm Channel Manager requires rabbitmq connection manager");
         }
 
-        this._rabbitmq = rabbitmq;
-        this._logger = logger ?? console;
-        this._channel = null;
-        this._connecting = false;
-        this._connectWaiters = [];
+        this.rabbitmq = rabbitmq;
+        this.logger = logger ?? console;
+        this.channel = null;
+        this.connecting = false;
+        this.connectWaiters = [];
     }
 
     public async getChannel(): Promise<ConfirmChannel> {
-        if (this._channel) return this._channel;
+        if (this.channel) return this.channel;
 
-        if (this._connecting) {
+        if (this.connecting) {
             return new Promise<ConfirmChannel>((resolve, reject) => {
-                this._connectWaiters.push({ resolve, reject });
+                this.connectWaiters.push({ resolve, reject });
             });
         }
 
@@ -49,18 +49,18 @@ export class ConfirmChannelManager extends EventEmitter {
     }
 
     private async _connect(): Promise<ConfirmChannel> {
-        this._connecting = true;
+        this.connecting = true;
         try {
             let connection: ChannelModel;
 
-            const rawConnection = (this._rabbitmq as any).connection;
+            const rawConnection = (this.rabbitmq as any).connection;
 
             if (rawConnection) {
                 connection = rawConnection;
             } else {
-                await this._rabbitmq.connect();
+                await this.rabbitmq.connect();
 
-                const freshConnection = (this._rabbitmq as any).connection;
+                const freshConnection = (this.rabbitmq as any).connection;
                 if (!freshConnection) {
                     throw new Error('Failed to obtain RabbitMQ connection');
                 }
@@ -74,34 +74,34 @@ export class ConfirmChannelManager extends EventEmitter {
             confirmChannel.on('drain', () => this.emit('drain'));
 
             confirmChannel.on("close", () => {
-                this._logger.warn('[ChannelManager] confirm channel closed unexpectedly');
-                this._channel = null;
+                this.logger.warn('[ChannelManager] confirm channel closed unexpectedly');
+                this.channel = null;
             });
 
             confirmChannel.on("error", (err: any) => {
-                this._logger.error('[ChannelManager] confirm channel error', {
+                this.logger.error('[ChannelManager] confirm channel error', {
                     error: err.message,
                     stack: err.stack,
                     code: err.code,
                 });
-                this._channel = null;
+                this.channel = null;
                 this.emit('error', err);
             });
 
-            this._channel = confirmChannel;
-            this._logger.info('[ChannelManager] confirm channel ready');
+            this.channel = confirmChannel;
+            this.logger.info('[ChannelManager] confirm channel ready');
 
-            for (const w of this._connectWaiters) w.resolve(confirmChannel);
-            this._connectWaiters = [];
+            for (const w of this.connectWaiters) w.resolve(confirmChannel);
+            this.connectWaiters = [];
 
             return confirmChannel;
 
         } catch (error) {
-            for (const w of this._connectWaiters) w.reject(error);
-            this._connectWaiters = [];
+            for (const w of this.connectWaiters) w.reject(error);
+            this.connectWaiters = [];
             throw error;
         } finally {
-            this._connecting = false;
+            this.connecting = false;
         }
     }
 }
