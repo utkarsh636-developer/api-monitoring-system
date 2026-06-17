@@ -104,4 +104,15 @@ export class ConfirmChannelManager extends EventEmitter {
             this.connecting = false;
         }
     }
+
+    public async close(): Promise<void> {
+        if (this.channel) {
+            try {
+                await this.channel.close();
+            } catch (err: any) {
+                this.logger.error('[ChannelManager] Error closing channel', err);
+            }
+            this.channel = null;
+        }
+    }
 }

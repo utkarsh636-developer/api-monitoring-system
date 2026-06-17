@@ -111,4 +111,21 @@ export class EventProducer {
         });
     }
 
+    public async shutdown(): Promise<void> {
+        this.shuttingDown = true;
+        this.logger.info('[EventProducer] shutting down…');
+        await this.channelManager.close();
+        this.logger.info('[EventProducer] shutting completed');
+    }
+
+    public getStats(): {
+        metrics: EventProducerMetrics;
+        circuitBreaker: ReturnType<CircuitBreaker['snapshot']>;
+    } {
+        return {
+            metrics: { ...this.metrics },
+            circuitBreaker: this.circuitBreaker.snapshot()
+        };
+    }
+
 }
