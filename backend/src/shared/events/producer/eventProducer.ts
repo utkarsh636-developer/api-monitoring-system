@@ -58,6 +58,73 @@ export class EventProducer {
         this.metrics[metric] = (this.metrics[metric] || 0) + 1;
     }
 
+    public async publishApiHit(
+        eventData: { eventId: string; endpoint: string; [key: string]: any },
+        opts: { correlationId?: string } = {}
+    ): Promise<boolean> {
+        if (this.shuttingDown) {
+            const error = new Error("EventProducer is shutting down") as Error & { code?: string };
+            error.code = 'SHUTDOWN_IN_PROGRESS';
+            this.logger.info('[EventProducer] publish rejected — shutting down', {
+                eventId: eventData.eventId,
+            });
+            throw error;
+        }
+
+        if (!this.circuitBreaker.allowRequest()) {
+            this.logger.info('[EventProducer] circuit breaker rejected publish', {
+                eventId: eventData.eventId,
+                state: this.circuitBreaker.state,
+            });
+            return false;
+        }
+
+        const correlationId = opts.correlationId ?? eventData.eventId;
+        const startMs = Date.now();
+        let attempt = 0;
+
+        while (true) {
+            try {
+                await this.publish(eventData, { correlationId, attempt });
+                const latencyMs = Date.now() - startMs;
+                this.circuitBreaker.onSuccess();
+                this.incrementMetric('published');
+
+                this.logger.info('[EventProducer] published', {
+                    eventId: eventData.eventId,
+                    correlationId,
+                    attempt: attempt + 1,
+                    latencyMs,
+                    endpoint: eventData.endpoint,
+                });
+
+                return true;
+            } catch (err: any) {
+                this.logger.error('[EventProducer] publish attempt failed', {
+                    eventId: eventData.eventId,
+                    correlationId,
+                    attempt: attempt + 1,
+                    error: err.message || err,
+                });
+
+                const canRetry = isRetryable(err) && this.retry.shouldRetry(attempt);
+
+                if (!canRetry) {
+                    this.circuitBreaker.onFailure();
+                    this.incrementMetric('failed');
+                    if (!this.retry.shouldRetry(attempt)) {
+                        this.incrementMetric('retriesExhausted');
+                    }
+                    throw err;
+                }
+
+                await this.retry.wait(attempt);
+                attempt++;
+            }
+        }
+    }
+
+
     private async publish(
         eventData: { eventId: string; [key: string]: any },
         meta: { correlationId: string; attempt: number }
