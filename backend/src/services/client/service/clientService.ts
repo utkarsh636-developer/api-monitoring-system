@@ -246,4 +246,28 @@ export class ClientService {
         }
     }
 
+    async getClientByApiKey(apiKey: string): Promise<{ client: Client; apiKey: ApiKey } | null> {
+    try {
+        const keyObj = await this.apiKeyRepository.findByKeyValue(apiKey) as (ApiKey & { client: Client }) | null;
+
+        if (!keyObj) {
+            return null;
+        }
+
+        if (new Date() > new Date(keyObj.expiresAt)) {
+            return null;
+        }
+
+        const { client, ...key } = keyObj;
+
+        return {
+            client,
+            apiKey: key as ApiKey,
+        };
+    } catch (error) {
+        logger.error('Error finding client by API key:', error);
+        throw error;
+    }
+}
+
 }
