@@ -7,26 +7,19 @@ export interface BaseRepositoryDependencies {
     };
 }
 
-export class BaseRepository {
+export abstract class BaseRepository {
     protected logger: NonNullable<BaseRepositoryDependencies['logger']>;
 
     constructor({ logger = console }: BaseRepositoryDependencies = {}) {
         this.logger = logger;
     }
 
-    async save(...args: any[]): Promise<any> {
-        throw new Error('Method not implemented: save');
-    }
+    abstract save(...args: any[]): Promise<any>;
 
-    async find(...args: any[]): Promise<any> {
-        throw new Error('Method not implemented: find');
-    }
+    abstract find(...args: any[]): Promise<any>;
 
-    async count(...args: any[]): Promise<any> {
-        throw new Error('Method not implemented: count');
-    }
-
-    async deleteOldHits(...args: any[]): Promise<any> {
-        throw new Error('Method not implemented: deleteOldHits');
-    }
+    abstract count(...args: any[]): Promise<any>;
+    
+    abstract deleteOldHits(...args: any[]): Promise<any>;
 }
+
