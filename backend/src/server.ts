@@ -66,8 +66,8 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 app.use("/api/auth", authRouter);
-app.use("/api", clientRouter)
 app.use("/api/hit", ingestRouter);
+app.use("/api", clientRouter)
 // app.use("/api/analytics", analyticsRouter)
 
 app.use((req: Request, res: Response) => {
