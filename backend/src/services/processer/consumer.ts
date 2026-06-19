@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import config from '../../shared/config/index';
+import logger from '../../shared/config/logger';
+import rabbitmq from '../../shared/config/rabbitmq';
+import postgres from '../../shared/config/postgres';
+import processorContainer from './Dependencies/dependencies';
 import { EVENT_TYPES } from '../../shared/events/eventContract';
 import { RetryStrategy, isRetryable } from '../../shared/events/producer/retryStrategy';
 import { CircuitBreaker } from '../../shared/events/producer/circuitBreaker';
@@ -339,5 +344,79 @@ export class EventConsumer {
             this.logger.error('Error stopping consumer:', error);
         }
     }
-
 }
+
+const retryStrategy = new RetryStrategy({
+    maxRetries: config.rabbitmq.retryAttempts,
+    baseDelayMs: config.rabbitmq.retryDelay,
+    maxDelayMs: 30_000,
+    jitterFactor: 0.3,
+});
+
+const circuitBreaker = new CircuitBreaker({
+    failureThreshold: 5,
+    cooldownMs: 30_000,
+    halfOpenMaxAttempts: 3,
+    logger,
+});
+
+const consumer = new EventConsumer({
+    processorService: processorContainer.services.processorService,
+    rabbitmq,
+    postgres,
+    config,
+    logger,
+    retryStrategy,
+    circuitBreaker,
+});
+
+async function startConsumerWithRetry(): Promise<void> {
+    const startupRetry = new RetryStrategy({ maxRetries: 5, baseDelayMs: 5000, maxDelayMs: 30_000 });
+    let attempt = 0;
+
+    while (startupRetry.shouldRetry(attempt) || attempt === 0) {
+        try {
+            logger.info(`Starting consumer (attempt ${attempt + 1})`);
+            await consumer.start();
+            logger.info('Consumer started successfully');
+            return;
+        } catch (error) {
+            attempt++;
+            logger.error(`Consumer start attempt ${attempt} failed:`, error);
+
+            if (!startupRetry.shouldRetry(attempt)) {
+                logger.error('Max retries reached, exiting...');
+                process.exit(1);
+            }
+
+            await startupRetry.wait(attempt - 1);
+        }
+    }
+}
+
+process.on('SIGINT', async () => {
+    logger.info('Received SIGINT, shutting down gracefully...');
+    await consumer.stop();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    logger.info('Received SIGTERM, shutting down gracefully...');
+    await consumer.stop();
+    process.exit(0);
+});
+
+process.on('uncaughtException', (error: Error) => {
+    logger.error('Uncaught exception:', error);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+    logger.error('Unhandled promise rejection at:', promise, 'reason:', reason);
+    process.exit(1);
+});
+
+startConsumerWithRetry();
+
+export default consumer;
+
