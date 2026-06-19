@@ -21,6 +21,14 @@ export interface EventConsumerDependencies {
     circuitBreaker: CircuitBreaker;
 }
 
+export interface ParsedMessage {
+    type: string;
+    data: Record<string, any>;
+    messageId: string;
+    timestamp?: string | number;
+    retryCount: number;
+}
+
 export class EventConsumer {
     private processorService: ProcessorService;
     private rabbitmq: any;
@@ -167,6 +175,70 @@ export class EventConsumer {
             if (this.isRunning) {
                 setTimeout(() => this.reconnect(), 10000);
             }
+        }
+    }
+
+    async handleMessage(msg: any): Promise<void> {
+        if (!this.circuitBreaker.allowRequest()) {
+            this.logger.warn('Circuit breaker open, requeuing message');
+            this.channel.nack(msg, false, true);
+            return;
+        }
+        const startTime = Date.now();
+        let messageData: ParsedMessage | null = null;
+        try {
+            messageData = this.parseMessage(msg);
+            // Idempotency (Duplicate Prevention)
+            if (this.processedIds.has(messageData.messageId)) {
+                this.logger.debug('Duplicate message skipped', { messageId: messageData.messageId });
+                this.channel.ack(msg);
+                return;
+            }
+            await this.processMessage(messageData);
+            this.channel.ack(msg);
+            this.circuitBreaker.onSuccess();
+            this.stats.processed++;
+            this.stats.lastProcessedAt = new Date();
+            this.processedIds.add(messageData.messageId);
+            if (this.processedIds.size > 100_000) {
+                const first = this.processedIds.values().next().value;
+                if (first !== undefined) {
+                    this.processedIds.delete(first);
+                }
+            }
+            this.poisonMessages.delete(messageData.type);
+        } catch (error) {
+            await this.handleProcessingError(error, msg, messageData, startTime);
+        }
+    }
+
+    private parseMessage(msg: any): ParsedMessage {
+        try {
+            const content = msg.content.toString();
+            const messageData = JSON.parse(content);
+            const parsed = messageSchema.safeParse(messageData);
+            if (!parsed.success) {
+                throw new Error(`Schema validation failed: ${parsed.error.issues.map(i => i.message).join(', ')}`);
+            }
+            return {
+                type: parsed.data.type,
+                data: parsed.data.data,
+                messageId: msg.properties.messageId || parsed.data.messageId || messageData.messageId || "unknown",
+                timestamp: parsed.data.timestamp,
+                retryCount: parseInt(msg.properties.headers?.['x-retry-count'] || 0, 10)
+            };
+        } catch (error: any) {
+            throw new Error(`Message parsing failed: ${error.message}`);
+        }
+    }
+
+    private async processMessage(messageData: ParsedMessage): Promise<void> {
+        switch (messageData.type) {
+            case EVENT_TYPES.API_HIT:
+                await this.processorService.processEvent(messageData.data as any);
+                break;
+            default:
+                throw new Error(`Unknown event type: ${messageData.type}`);
         }
     }
 }
