@@ -67,16 +67,64 @@ export class EventConsumer {
         this.poisonMessages = new Map();
     }
 
+    async start(): Promise<void> {
+        try {
+            await this.connectDatabases();
+            this.channel = await this.rabbitmq.connect();
+            const prefetch = this.config.consumer?.prefetch || 10;
+            this.channel.prefetch(prefetch);
+
+            this.channel.on('error', (err: any) => {
+                this.logger.error('Consumer channel error:', err);
+                this.circuitBreaker.onFailure();
+            });
+
+            this.channel.on('close', () => {
+                this.logger.warn('Consumer channel closed unexpectedly');
+                if (this.isRunning) this.reconnect();
+            });
+
+            this.logger.info(`Started consuming from queue: ${this.config.rabbitmq.queue}`);
+            this.isRunning = true;
+
+            await this.channel.consume(
+                this.config.rabbitmq.queue,
+                async (msg: any) => {
+                    if (msg !== null) await this.handleMessage(msg);
+                },
+                { noAck: false, consumerTag: `consumer-${Date.now()}` }
+            );
+
+            this.logger.info('Event consumer is running');
+        } catch (error) {
+            this.logger.error('Failed to start consumer:', error);
+            await this.cleanup();
+            throw error;
+        }
+    }
+
+    private async cleanup(): Promise<void> {
+        try {
+            this.isRunning = false;
+            if (this.channel) {
+                await this.channel.close();
+                this.channel = null;
+            }
+        } catch (error) {
+            this.logger.error('Error during cleanup:', error);
+        }
+    }
+
     private async connectDatabases(): Promise<void> {
         const maxRetries = 5;
         let retries = 0;
-
+        
         while (retries < maxRetries) {
             try {
                 this.logger.info('Connecting to database...');
                 
                 await this.postgres.testConnection();
-
+                
                 this.logger.info('Database connection established');
                 return;
             } catch (error: any) {
@@ -86,6 +134,38 @@ export class EventConsumer {
                     throw new Error(`Failed to connect to database after ${maxRetries} attempts`);
                 }
                 await new Promise(resolve => setTimeout(resolve, 5000 * retries));
+            }
+        }
+    }
+
+    private async reconnect(): Promise<void> {
+        try {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            this.channel = await this.rabbitmq.connect();
+            const prefetch = this.config.consumer?.prefetch || 10;
+            this.channel.prefetch(prefetch);
+    
+            this.channel.on('error', (err: any) => {
+                this.logger.error('Consumer channel error:', err);
+                this.circuitBreaker.onFailure();
+            });
+    
+            this.channel.on('close', () => {
+                this.logger.warn('Consumer channel closed unexpectedly');
+                if (this.isRunning) this.reconnect();
+            });
+    
+            await this.channel.consume(
+                this.config.rabbitmq.queue,
+                async (msg: any) => {
+                    if (msg !== null) await this.handleMessage(msg);
+                },
+                { noAck: false, consumerTag: `consumer-${Date.now()}` }
+            );
+        } catch (error) {
+            this.logger.error('Failed to reconnect:', error);
+            if (this.isRunning) {
+                setTimeout(() => this.reconnect(), 10000);
             }
         }
     }
