@@ -28,4 +28,4 @@ RUN npm prune --production
 RUN mkdir -p logs
 
 # 5. Start the consumer using the compiled JS in the correct 'processer' path
-CMD ["node", "dist/services/processer/consumer.js"]
+CMD ["node", "dist/src/services/processer/consumer.js"]
