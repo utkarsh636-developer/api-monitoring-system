@@ -241,4 +241,103 @@ export class EventConsumer {
                 throw new Error(`Unknown event type: ${messageData.type}`);
         }
     }
+
+    private async handleProcessingError(
+        error: any,
+        msg: any,
+        messageData: ParsedMessage | null,
+        startTime: number
+    ): Promise<void> {
+        const messageId = messageData?.messageId || msg.properties?.messageId || 'unknown';
+        const retryCount = messageData?.retryCount || 0;
+        this.circuitBreaker.onFailure();
+        this.stats.failed++;
+
+        const eventType = messageData?.type || 'unknown';
+        const poisonCount = (this.poisonMessages.get(eventType) || 0) + 1;
+        this.poisonMessages.set(eventType, poisonCount);
+        if (poisonCount >= 10) {
+            this.logger.error('Poison message pattern detected', { eventType, consecutiveFailures: poisonCount });
+        }
+
+        const isMaxRetriesExceeded = !this.retryStrategy.shouldRetry(retryCount);
+
+        // Non-retryable errors or max retries exceeded go straight to Dead-Letter Queue (DLQ)
+        if (!isRetryable(error) || isMaxRetriesExceeded) {
+            await this.sendToDLQ(
+                msg,
+                error,
+                isMaxRetriesExceeded ? 'MAX_RETRIES_EXCEEDED' : 'NON_RETRYABLE'
+            );
+            return;
+        }
+
+        await this.retryMessage(msg, retryCount);
+    }
+
+    private async sendToDLQ(msg: any, error: any, reason: string): Promise<void> {
+        try {
+            const dlqName = `${this.config.rabbitmq.queue}.dlq`;
+            this.channel.sendToQueue(dlqName, msg.content, {
+                ...msg.properties,
+                persistent: true,
+                headers: {
+                    ...msg.properties.headers,
+                    'x-dlq-reason': reason,
+                    'x-dlq-error': error.message,
+                    'x-dlq-timestamp': Date.now(),
+                    'x-original-queue': this.config.rabbitmq.queue,
+                },
+            });
+
+            this.channel.ack(msg);
+            this.stats.dlqRouted++;
+        } catch (err) {
+            this.logger.error('Failed to send message to DLQ:', err);
+            this.channel.nack(msg, false, false);
+        }
+    }
+
+    private async retryMessage(msg: any, retryCount: number): Promise<void> {
+        const delay = this.retryStrategy.delay(retryCount);
+
+        const retryHeaders = {
+            ...msg.properties.headers,
+            'x-retry-count': retryCount + 1,
+            'x-retry-timestamp': Date.now(),
+            'x-retry-delay': delay,
+            'x-original-queue': this.config.rabbitmq.queue,
+        };
+
+        setTimeout(() => {
+            try {
+                this.channel.sendToQueue(this.config.rabbitmq.queue, msg.content, { ...msg.properties, headers: retryHeaders });
+                this.logger.info('Message scheduled for retry', {
+                    messageId: msg.properties.messageId,
+                    retryCount: retryCount + 1,
+                    delay,
+                });
+            } catch (error) {
+                this.logger.error('Failed to schedule retry:', error);
+                this.sendToDLQ(msg, error, 'RETRY_FAILED');
+            }
+        }, delay);
+
+        this.channel.ack(msg);
+        this.stats.retried++;
+    }
+
+    async stop(): Promise<void> {
+        try {
+            await this.cleanup();
+
+            await Promise.all([
+                this.rabbitmq.close(),
+                this.postgres.close()
+            ]);
+        } catch (error) {
+            this.logger.error('Error stopping consumer:', error);
+        }
+    }
+
 }
