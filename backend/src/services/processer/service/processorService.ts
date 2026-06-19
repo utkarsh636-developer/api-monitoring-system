@@ -59,7 +59,7 @@ export class ProcessorService {
                 eventId: eventData.eventId
             });
 
-            await this._updateMetricsWithFallback(eventData);
+            await this.updateMetricsWithFallback(eventData);
 
             logger.info('Event processed successfully:', {
                 eventId: eventData.eventId
@@ -80,7 +80,7 @@ export class ProcessorService {
         }
     }
 
-    private async _updateMetricsWithFallback(eventData: Prisma.ApiHitUncheckedCreateInput): Promise<void> {
+    private async updateMetricsWithFallback(eventData: Prisma.ApiHitUncheckedCreateInput): Promise<void> {
         try {
             const timeBucket = this.getTimeBucket(eventData.timestamp, "hour");
 
