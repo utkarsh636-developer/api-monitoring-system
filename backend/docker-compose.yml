@@ -71,6 +71,33 @@ services:
     depends_on:
       - postgres
 
+  consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile.consumer
+    container_name: api-monitoring-consumer
+    environment:
+      NODE_ENV: production
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: api_monitoring
+      PG_USER: postgres
+      PG_PASSWORD: ${PG_PASSWORD:-postgres}
+      DATABASE_URL: postgresql://postgres:${PG_PASSWORD:-postgres}@postgres:5432/api_monitoring?schema=public
+      RABBITMQ_URL: amqp://api_user:${RABBITMQ_PASSWORD:-utk_rabbitmq_password}@rabbitmq:5672/api_monitoring
+      RABBITMQ_QUEUE: api_hits
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_here}
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - api-monitoring-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
     driver: local

@@ -1,0 +1,31 @@
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package configuration files
+COPY package*.json ./
+
+# 1. Install all dependencies (including typescript and devDependencies for building)
+RUN npm install
+
+# Copy database schema first
+COPY prisma ./prisma/
+
+# 2. Generate Prisma Client (crucial for TS compilation to succeed)
+RUN npx prisma generate
+
+# Copy the rest of the application code
+COPY . .
+
+# 3. Compile TypeScript code to JS (outputs to /dist)
+RUN npm run build
+
+# 4. Prune devDependencies to keep the production image small
+RUN npm prune --production
+
+# Create logs directory
+RUN mkdir -p logs
+
+# 5. Start the consumer using the compiled JS in the correct 'processer' path
+CMD ["node", "dist/services/processer/consumer.js"]
