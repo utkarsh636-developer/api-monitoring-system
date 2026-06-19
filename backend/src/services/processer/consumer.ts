@@ -2,7 +2,7 @@ import { z } from 'zod';
 import config from '../../shared/config/index';
 import logger from '../../shared/config/logger';
 import rabbitmq from '../../shared/config/rabbitmq';
-import postgres from '../../shared/config/postgres';
+import dbConnection from '../../shared/config/prisma';
 import processorContainer from './Dependencies/dependencies';
 import { EVENT_TYPES } from '../../shared/events/eventContract';
 import { RetryStrategy, isRetryable } from '../../shared/events/producer/retryStrategy';
@@ -19,7 +19,6 @@ const messageSchema = z.object({
 export interface EventConsumerDependencies {
     processorService: ProcessorService;
     rabbitmq: any;
-    postgres: any;
     config: any;
     logger: any;
     retryStrategy: RetryStrategy;
@@ -37,7 +36,6 @@ export interface ParsedMessage {
 export class EventConsumer {
     private processorService: ProcessorService;
     private rabbitmq: any;
-    private postgres: any;
     private config: any;
     private logger: any;
     private retryStrategy: RetryStrategy;
@@ -59,7 +57,6 @@ export class EventConsumer {
     constructor({
         processorService,
         rabbitmq,
-        postgres,
         config,
         logger,
         retryStrategy,
@@ -67,7 +64,6 @@ export class EventConsumer {
     }: EventConsumerDependencies) {
         this.processorService = processorService;
         this.rabbitmq = rabbitmq;
-        this.postgres = postgres;
         this.config = config;
         this.logger = logger;
         this.retryStrategy = retryStrategy;
@@ -134,9 +130,9 @@ export class EventConsumer {
         
         while (retries < maxRetries) {
             try {
-                this.logger.info('Connecting to database...');
+                this.logger.info('Connecting to database via Prisma...');
                 
-                await this.postgres.testConnection();
+                await dbConnection.connect();
                 
                 this.logger.info('Database connection established');
                 return;
@@ -338,7 +334,7 @@ export class EventConsumer {
 
             await Promise.all([
                 this.rabbitmq.close(),
-                this.postgres.close()
+                dbConnection.close()
             ]);
         } catch (error) {
             this.logger.error('Error stopping consumer:', error);
@@ -363,7 +359,6 @@ const circuitBreaker = new CircuitBreaker({
 const consumer = new EventConsumer({
     processorService: processorContainer.services.processorService,
     rabbitmq,
-    postgres,
     config,
     logger,
     retryStrategy,
@@ -419,4 +414,5 @@ process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) =>
 startConsumerWithRetry();
 
 export default consumer;
+
 
