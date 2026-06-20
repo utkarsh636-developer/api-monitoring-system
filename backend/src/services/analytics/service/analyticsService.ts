@@ -23,6 +23,40 @@ export interface OverallStats {
     };
 }
 
+export interface TopEndpointsOptions {
+    limit?: number;
+    startTime?: string | number | Date | null;
+}
+
+export interface TopEndpointResult {
+    serviceName: string;
+    endpoint: string;
+    method: string;
+    totalHits: number;
+    avgLatency: number;
+    errorHits: number;
+    errorRate: number;
+}
+
+export interface TimeSeriesFilters {
+    serviceName?: string;
+    endpoint?: string;
+    startTime?: string | number | Date | null;
+    endTime?: string | number | Date | null;
+    limit?: number;
+}
+export interface TimeSeriesResult {
+    serviceName: string;
+    endpoint: string;
+    method: string;
+    totalHits: number;
+    errorHits: number;
+    avgLatency: number;
+    minLatency: number;
+    maxLatency: number;
+    timeBucket: Date | string;
+}
+
 export class AnalyticsService {
     private metricsRepository: MetricsRepository;
     private authService: AuthService;
@@ -162,5 +196,70 @@ export class AnalyticsService {
         if (typeof id !== 'string') return false;
         const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
         return uuidRegex.test(id);
+    }
+
+    async getTopEndpoints(clientId: string | null | undefined, options: TopEndpointsOptions = {}): Promise<TopEndpointResult[]> {
+        try {
+            const { limit = 10, startTime } = options;
+            const parsedStartTime = startTime ? new Date(startTime) : null;
+            const endpoints = await this.metricsRepository.getTopEndpoints(clientId, limit, parsedStartTime);
+            return endpoints.map((endpoint: any) => {
+                const serviceName = endpoint.serviceName ?? endpoint.service_name;
+                const totalHits = parseInt(endpoint.totalHits ?? endpoint.total_hits) || 0;
+                const errorHits = parseInt(endpoint.errorHits ?? endpoint.error_hits) || 0;
+                const avgLatency = parseFloat(endpoint.avgLatency ?? endpoint.avg_latency) || 0;
+                const errorRate = totalHits > 0 ? (errorHits / totalHits) * 100 : 0;
+                return {
+                    serviceName,
+                    endpoint: endpoint.endpoint,
+                    method: endpoint.method,
+                    totalHits,
+                    avgLatency: parseFloat(avgLatency.toFixed(2)),
+                    errorHits,
+                    errorRate: parseFloat(errorRate.toFixed(2)),
+                };
+            });
+        } catch (error) {
+            logger.error('Error getting top endpoints:', error);
+            throw error;
+        }
+    }
+    
+    async getTimeSeries(clientId: string | null | undefined, filters: TimeSeriesFilters = {}): Promise<TimeSeriesResult[]> {
+        try {
+            const { serviceName, endpoint, startTime, endTime, limit = 100 } = filters;
+            const { endTime: end_time, startTime: start_time } = this.parseTimeFilters({ startTime, endTime });
+            const metrics = await this.metricsRepository.getMetrics({
+                clientId,
+                serviceName,
+                endpoint,
+                startTime: start_time,
+                endTime: end_time,
+                limit,
+            });
+            return metrics.map((metric: any) => {
+                const serviceName = metric.serviceName ?? metric.service_name;
+                const totalHits = parseInt(metric.totalHits ?? metric.total_hits) || 0;
+                const errorHits = parseInt(metric.errorHits ?? metric.error_hits) || 0;
+                const avgLatency = parseFloat(metric.avgLatency ?? metric.avg_latency) || 0;
+                const minLatency = parseFloat(metric.minLatency ?? metric.min_latency) || 0;
+                const maxLatency = parseFloat(metric.maxLatency ?? metric.max_latency) || 0;
+                const timeBucket = metric.timeBucket ?? metric.time_bucket;
+                return {
+                    serviceName,
+                    endpoint: metric.endpoint,
+                    method: metric.method,
+                    totalHits,
+                    errorHits,
+                    avgLatency: parseFloat(avgLatency.toFixed(2)),
+                    minLatency: parseFloat(minLatency.toFixed(2)),
+                    maxLatency: parseFloat(maxLatency.toFixed(2)),
+                    timeBucket,
+                };
+            });
+        } catch (error) {
+            logger.error('Error getting time series:', error);
+            throw error;
+        }
     }
 }
