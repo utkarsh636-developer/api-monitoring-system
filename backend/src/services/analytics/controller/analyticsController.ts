@@ -1,44 +1,35 @@
 import { Request, Response, NextFunction } from 'express';
 import ResponseFormatter from '../../../shared/utils/responseFormatter';
 import AppError from '../../../shared/utils/AppError';
-import logger from '../../../shared/config/logger';
 import { AnalyticsService } from '../service/analyticsService';
-import { AuthService } from '../../auth/service/authService';
-import { ClientRepository } from '../../client/repository/clientRepository';
 
 export interface AnalyticsControllerDependencies {
     analyticsService: AnalyticsService;
-    authService: AuthService;
-    clientRepository: ClientRepository;
 }
 
 export class AnalyticsController {
     private analyticsService: AnalyticsService;
-    private authService: AuthService;
-    private clientRepository: ClientRepository;
 
     constructor(dependencies: AnalyticsControllerDependencies) {
-        if (!dependencies) {
-            throw new Error('AnalyticsController requires analyticsService, authService, and clientRepository');
+        if (!dependencies || !dependencies.analyticsService) {
+            throw new Error('AnalyticsController requires analyticsService');
         }
         
-        const { analyticsService, authService, clientRepository } = dependencies;
-
-        if (!analyticsService || !authService || !clientRepository) {
-            throw new Error('AnalyticsController requires analyticsService, authService, and clientRepository');
-        }
-
-        this.analyticsService = analyticsService;
-        this.authService = authService;
-        this.clientRepository = clientRepository;
+        this.analyticsService = dependencies.analyticsService;
     }
 
     async getStats(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { startTime, endTime } = req.query;
+            const { startTime, endTime, clientId } = req.query;
+            const userId = req.user?.userId;
+            const userClientId = req.user?.clientId;
 
-            const isAdmin = await this.ensureCanViewAnalytics(req);
-            const finalClientId = await this.resolveFinalClientId(req, isAdmin);
+            const isSuperAdmin = await this.analyticsService.ensureCanViewAnalytics(userId);
+            const finalClientId = await this.analyticsService.resolveFinalClientId({
+                queryClientId: clientId as string | undefined,
+                userClientId,
+                isSuperAdmin
+            });
             const timeRange = this.validateTimeRange(startTime, endTime);
 
             const stats = await this.analyticsService.getOverallStats(finalClientId, timeRange);
@@ -73,61 +64,11 @@ export class AnalyticsController {
         return { startTime: start, endTime: end };
     }
 
-    async ensureCanViewAnalytics(req: Request): Promise<boolean> {
-        if (!req.user || !req.user.userId) {
-            throw new AppError('Authentication required', 401);
+    async getDashboard(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            res.status(501).json(ResponseFormatter.error('Dashboard statistics not implemented yet', 501));
+        } catch (error) {
+            next(error);
         }
-
-        const isSuperAdmin = await this.authService.checkSuperAdminPermissions(req.user.userId);
-        if (isSuperAdmin) return true;
-
-        const profile = await this.authService.getProfile(req.user.userId);
-
-        if (!profile || !profile.canViewAnalytics) {
-            throw new AppError('Insufficient permissions to view analytics', 403);
-        }
-
-        return false;
-    }
-
-    async resolveFinalClientId(req: Request, isSuperAdmin: boolean): Promise<string | null> {
-        const queryClientId = req.query.clientId as string | undefined;
-        const userClientId = req.user?.clientId;
-
-        if (isSuperAdmin) {
-            if (queryClientId) {
-                if (!this.isValidUUID(queryClientId)) {
-                    throw new AppError('Invalid clientId format', 400);
-                }
-
-                const client = await this.clientRepository.findById(queryClientId);
-
-                if (!client) throw new AppError('Client not found', 404);
-
-                return queryClientId;
-            }
-
-            return null;
-        }
-
-        if (!userClientId) {
-            throw new AppError('Access denied - no client association', 403);
-        }
-
-        if (!this.isValidUUID(userClientId)) {
-            throw new AppError('Invalid client association', 400);
-        }
-
-        const client = await this.clientRepository.findById(userClientId);
-
-        if (!client) throw new AppError('Client not found', 404);
-
-        return userClientId;
-    }
-
-    isValidUUID(id: any): boolean {
-        if (typeof id !== 'string') return false;
-        const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-        return uuidRegex.test(id);
     }
 }

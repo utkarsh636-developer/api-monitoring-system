@@ -1,6 +1,8 @@
 import logger from '../../../shared/config/logger';
 import AppError from '../../../shared/utils/AppError';
 import { MetricsRepository } from '../../processer/repository/metricsRepository';
+import { AuthService } from '../../auth/service/authService';
+import { ClientRepository } from '../../client/repository/clientRepository';
 
 export interface AnalyticsFilters {
     startTime?: string | number | Date | null;
@@ -23,12 +25,26 @@ export interface OverallStats {
 
 export class AnalyticsService {
     private metricsRepository: MetricsRepository;
+    private authService: AuthService;
+    private clientRepository: ClientRepository;
 
-    constructor(metricsRepo: MetricsRepository) {
+    constructor(
+        metricsRepo: MetricsRepository,
+        authService: AuthService,
+        clientRepository: ClientRepository
+    ) {
         if (!metricsRepo) {
             throw new Error("AnalyticsService requires a metricsRepository");
         }
+        if (!authService) {
+            throw new Error("AnalyticsService requires an authService");
+        }
+        if (!clientRepository) {
+            throw new Error("AnalyticsService requires a clientRepository");
+        }
         this.metricsRepository = metricsRepo;
+        this.authService = authService;
+        this.clientRepository = clientRepository;
     }
 
     async getOverallStats(clientId: string | null | undefined, filters: AnalyticsFilters = {}): Promise<OverallStats> {
@@ -40,7 +56,6 @@ export class AnalyticsService {
                 startTime,
                 endTime
             );
-
 
             const totalHits = parseInt(stats.totalHits ?? stats.total_hits) || 0;
             const errorHits = parseInt(stats.errorHits ?? stats.error_hits) || 0;
@@ -86,5 +101,66 @@ export class AnalyticsService {
         }
 
         return { startTime, endTime };
+    }
+
+    async ensureCanViewAnalytics(userId: string | undefined): Promise<boolean> {
+        if (!userId) {
+            throw new AppError('Authentication required', 401);
+        }
+
+        const isSuperAdmin = await this.authService.checkSuperAdminPermissions(userId);
+        if (isSuperAdmin) return true;
+
+        const profile = await this.authService.getProfile(userId);
+
+        if (!profile || !profile.canViewAnalytics) {
+            throw new AppError('Insufficient permissions to view analytics', 403);
+        }
+
+        return false;
+    }
+
+    async resolveFinalClientId(params: {
+        queryClientId?: string;
+        userClientId?: string | null;
+        isSuperAdmin: boolean;
+    }): Promise<string | null> {
+        const { queryClientId, userClientId, isSuperAdmin } = params;
+
+        if (isSuperAdmin) {
+            if (queryClientId) {
+                if (!this.isValidUUID(queryClientId)) {
+                    throw new AppError('Invalid clientId format', 400);
+                }
+
+                const client = await this.clientRepository.findById(queryClientId);
+
+                if (!client) throw new AppError('Client not found', 404);
+
+                return queryClientId;
+            }
+
+            return null;
+        }
+
+        if (!userClientId) {
+            throw new AppError('Access denied - no client association', 403);
+        }
+
+        if (!this.isValidUUID(userClientId)) {
+            throw new AppError('Invalid client association', 400);
+        }
+
+        const client = await this.clientRepository.findById(userClientId);
+
+        if (!client) throw new AppError('Client not found', 404);
+
+        return userClientId;
+    }
+
+    isValidUUID(id: any): boolean {
+        if (typeof id !== 'string') return false;
+        const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+        return uuidRegex.test(id);
     }
 }

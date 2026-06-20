@@ -12,7 +12,11 @@ class Container {
             metricsRepository: processorContainer.repositories.metricsRepository,
         };
 
-        const analyticsService = new AnalyticsService(repositories.metricsRepository);
+        const analyticsService = new AnalyticsService(
+            repositories.metricsRepository,
+            authContainer.services.authService,
+            repositories.clientRepository
+        );
 
         const services = {
             analyticsService,
@@ -21,8 +25,6 @@ class Container {
 
         const analyticsController = new AnalyticsController({
             analyticsService: services.analyticsService,
-            authService: services.authService,
-            clientRepository: repositories.clientRepository,
         });
 
         const controllers = {
