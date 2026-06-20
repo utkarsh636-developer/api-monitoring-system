@@ -66,7 +66,37 @@ export class AnalyticsController {
 
     async getDashboard(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            res.status(501).json(ResponseFormatter.error('Dashboard statistics not implemented yet', 501));
+            const { startTime, endTime, clientId } = req.query;
+            const userId = req.user?.userId;
+            const userClientId = req.user?.clientId;
+
+            const isSuperAdmin = await this.analyticsService.ensureCanViewAnalytics(userId);
+            const finalClientId = await this.analyticsService.resolveFinalClientId({
+                queryClientId: clientId as string | undefined,
+                userClientId,
+                isSuperAdmin
+            });
+            const timeRange = this.validateTimeRange(startTime, endTime);
+
+            const result = await Promise.allSettled([
+                this.analyticsService.getOverallStats(finalClientId, timeRange),
+                this.analyticsService.getTopEndpoints(finalClientId, { limit: 5, startTime: timeRange.startTime }),
+                this.analyticsService.getTimeSeries(finalClientId, { ...timeRange, limit: 24 }),
+            ]);
+
+            const [stats, topEndpoints, recentTimeSeries] = result.map((item) => 
+                item.status === "fulfilled" ? item.value : null
+            );
+
+            const dashboard = {
+                stats,
+                topEndpoints,
+                recentActivity: recentTimeSeries // Fixed the typo: recentActitivy -> recentActivity
+            };
+
+            res.status(200).json(
+                ResponseFormatter.success(dashboard, "Dashboard data retrieved successfully", 200)
+            );
         } catch (error) {
             next(error);
         }
