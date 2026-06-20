@@ -3,8 +3,8 @@ import AppError from '../../../shared/utils/AppError';
 import { MetricsRepository } from '../../processer/repository/metricsRepository';
 
 export interface AnalyticsFilters {
-    startTime?: string | Date;
-    endTime?: string | Date;
+    startTime?: string | number | Date | null;
+    endTime?: string | number | Date | null;
 }
 
 export interface OverallStats {
