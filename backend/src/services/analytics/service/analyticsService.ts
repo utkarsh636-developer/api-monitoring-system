@@ -3,6 +3,7 @@ import AppError from '../../../shared/utils/AppError';
 import { MetricsRepository } from '../../processer/repository/metricsRepository';
 import { AuthService } from '../../auth/service/authService';
 import { ClientRepository } from '../../client/repository/clientRepository';
+import CacheService from '../../../shared/service/cacheService';
 
 export interface AnalyticsFilters {
     startTime?: string | number | Date | null;
@@ -85,6 +86,18 @@ export class AnalyticsService {
         try {
             const { startTime, endTime } = this.parseTimeFilters(filters);
 
+            // Check Redis Cache First
+            const cacheKey = `analytics:stats:${clientId ?? 'global'}:${startTime.getTime()}:${endTime.getTime()}`;
+            const cachedData = await CacheService.get<OverallStats>(cacheKey);
+            if (cachedData) {
+                logger.debug('Analytics Stats Cache Hit');
+                // Ensure dates are parsed back to Date objects from JSON string
+                cachedData.timeRange.start = new Date(cachedData.timeRange.start);
+                cachedData.timeRange.end = new Date(cachedData.timeRange.end);
+                return cachedData;
+            }
+
+            logger.debug('Analytics Stats Cache Miss, querying database');
             const stats = await this.metricsRepository.getOverallStats(
                 clientId,
                 startTime,
@@ -99,7 +112,7 @@ export class AnalyticsService {
 
             const errorRate = totalHits > 0 ? (errorHits / totalHits) * 100 : 0;
 
-            return {
+            const result: OverallStats = {
                 totalHits,
                 errorHits,
                 successHits: totalHits - errorHits,
@@ -112,6 +125,11 @@ export class AnalyticsService {
                     end: endTime,
                 },
             };
+
+            // Save to Redis Cache (TTL of 30 seconds to keep data fresh)
+            await CacheService.set(cacheKey, result, 30);
+
+            return result;
         } catch (error) {
             logger.error('Error getting overall stats:', error);
             throw error;
@@ -202,8 +220,18 @@ export class AnalyticsService {
         try {
             const { limit = 10, startTime } = options;
             const parsedStartTime = startTime ? new Date(startTime) : null;
+
+            // 1. Check Redis Cache First
+            const cacheKey = `analytics:top:${clientId ?? 'global'}:${limit}:${parsedStartTime ? parsedStartTime.getTime() : 'all'}`;
+            const cachedData = await CacheService.get<TopEndpointResult[]>(cacheKey);
+            if (cachedData) {
+                logger.debug('Analytics Top Endpoints Cache Hit');
+                return cachedData;
+            }
+
+            logger.debug('Analytics Top Endpoints Cache Miss, querying database');
             const endpoints = await this.metricsRepository.getTopEndpoints(clientId, limit, parsedStartTime);
-            return endpoints.map((endpoint: any) => {
+            const result = endpoints.map((endpoint: any) => {
                 const serviceName = endpoint.serviceName ?? endpoint.service_name;
                 const totalHits = parseInt(endpoint.totalHits ?? endpoint.total_hits) || 0;
                 const errorHits = parseInt(endpoint.errorHits ?? endpoint.error_hits) || 0;
@@ -219,6 +247,11 @@ export class AnalyticsService {
                     errorRate: parseFloat(errorRate.toFixed(2)),
                 };
             });
+
+            // 2. Save to Redis Cache (30-second TTL)
+            await CacheService.set(cacheKey, result, 30);
+
+            return result;
         } catch (error) {
             logger.error('Error getting top endpoints:', error);
             throw error;
@@ -229,6 +262,16 @@ export class AnalyticsService {
         try {
             const { serviceName, endpoint, startTime, endTime, limit = 100 } = filters;
             const { endTime: end_time, startTime: start_time } = this.parseTimeFilters({ startTime, endTime });
+
+            // 1. Check Redis Cache First
+            const cacheKey = `analytics:ts:${clientId ?? 'global'}:${serviceName ?? 'all'}:${endpoint ?? 'all'}:${start_time.getTime()}:${end_time.getTime()}:${limit}`;
+            const cachedData = await CacheService.get<TimeSeriesResult[]>(cacheKey);
+            if (cachedData) {
+                logger.debug('Analytics TimeSeries Cache Hit');
+                return cachedData;
+            }
+
+            logger.debug('Analytics TimeSeries Cache Miss, querying database');
             const metrics = await this.metricsRepository.getMetrics({
                 clientId,
                 serviceName,
@@ -237,7 +280,7 @@ export class AnalyticsService {
                 endTime: end_time,
                 limit,
             });
-            return metrics.map((metric: any) => {
+            const result = metrics.map((metric: any) => {
                 const serviceName = metric.serviceName ?? metric.service_name;
                 const totalHits = parseInt(metric.totalHits ?? metric.total_hits) || 0;
                 const errorHits = parseInt(metric.errorHits ?? metric.error_hits) || 0;
@@ -257,6 +300,11 @@ export class AnalyticsService {
                     timeBucket,
                 };
             });
+
+            // 2. Save to Redis Cache (30-second TTL)
+            await CacheService.set(cacheKey, result, 30);
+
+            return result;
         } catch (error) {
             logger.error('Error getting time series:', error);
             throw error;
