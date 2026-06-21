@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import config from "../config/index";
 import logger from "../config/logger";
 import ResponseFormatter from "../utils/responseFormatter";
+import CacheService from '../service/cacheService';
 
 interface DecodedToken {
     userId: string;
@@ -36,6 +37,18 @@ const authenticate = async (
         if (!token) {
             return res.status(401).json(
                 ResponseFormatter.error("Authentication token is required", 401)
+            );
+        }
+
+        // Check if token is blacklisted (logged out)
+        const isBlacklisted = await CacheService.get<boolean>(`jwt:blacklist:${token}`);
+        if (isBlacklisted) {
+            logger.warn("Attempted access with blacklisted/logged-out token", {
+                path: req.path,
+                ip: req.ip,
+            });
+            return res.status(401).json(
+                ResponseFormatter.error("Token is invalid or logged out", 401)
             );
         }
 

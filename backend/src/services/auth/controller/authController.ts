@@ -3,6 +3,8 @@ import config from "../../../shared/config/index";
 import { APPLICATION_ROLES } from "../../../shared/constants/roles";
 import ResponseFormatter from "../../../shared/utils/responseFormatter";
 import { AuthService } from "../service/authService";
+import jwt from 'jsonwebtoken';
+import CacheService from "../../../shared/service/cacheService";
 
 export class AuthController {
     private authService: AuthService;
@@ -92,6 +94,22 @@ export class AuthController {
 
     async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
+            const token = req.cookies.authToken || req.headers.authorization?.split(" ")[1];
+
+            if (token) {
+                try {
+                    const decoded = jwt.decode(token) as { exp?: number };
+                    if (decoded && decoded.exp) {
+                        const remainingSeconds = decoded.exp - Math.floor(Date.now() / 1000);
+                        if (remainingSeconds > 0) {
+                            await CacheService.set(`jwt:blacklist:${token}`, true, remainingSeconds);
+                        }
+                    }
+                } catch (err) {
+                    // Ignore decode or Redis store errors on logout
+                }
+            }
+
             res.clearCookie("authToken");
             res.status(200).json(ResponseFormatter.success({}, "Logout successful", 200));
         } catch (error) {
