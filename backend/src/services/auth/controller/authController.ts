@@ -106,7 +106,9 @@ export class AuthController {
                         }
                     }
                 } catch (err) {
-                    // Ignore decode or Redis store errors on logout
+                    // Kept this EMPTY on purpose!
+                    // If Redis is offline or the token is corrupt, we catch the error
+                    // and ignore it so we can still log the user out.
                 }
             }
 

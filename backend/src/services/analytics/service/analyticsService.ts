@@ -164,16 +164,26 @@ export class AnalyticsService {
             throw new AppError('Authentication required', 401);
         }
 
-        const isSuperAdmin = await this.authService.checkSuperAdminPermissions(userId);
-        if (isSuperAdmin) return true;
+        const cacheKey = `user:permissions:${userId}`;
+        const cachedData = await CacheService.get<{ isSuperAdmin: boolean; canViewAnalytics: boolean }>(cacheKey);
 
-        const profile = await this.authService.getProfile(userId);
-
-        if (!profile || !profile.canViewAnalytics) {
+        if (cachedData) {
+            if (cachedData.isSuperAdmin) return true;
+            if (cachedData.canViewAnalytics) return false;
             throw new AppError('Insufficient permissions to view analytics', 403);
         }
 
-        return false;
+        const isSuperAdmin = await this.authService.checkSuperAdminPermissions(userId);
+        const profile = !isSuperAdmin ? await this.authService.getProfile(userId) : null;
+        const canViewAnalytics = isSuperAdmin || (profile ? !!profile.canViewAnalytics : false);
+
+        // Cache the checks in Redis for 5 minutes (300 seconds)
+        await CacheService.set(cacheKey, { isSuperAdmin, canViewAnalytics }, 300);
+
+        if (isSuperAdmin) return true;
+        if (canViewAnalytics) return false;
+
+        throw new AppError('Insufficient permissions to view analytics', 403);
     }
 
     async resolveFinalClientId(params: {
