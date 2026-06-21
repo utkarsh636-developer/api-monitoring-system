@@ -13,6 +13,7 @@ export interface ApiHitInput {
     apiKeyId?: string;
     ip?: string;
     userAgent?: string;
+    eventId?: string;
 }
 
 export interface IngestServiceDependencies {
@@ -32,7 +33,7 @@ export class IngestService {
             this.validateHitData(hitData);
 
             const event = {
-                eventId: crypto.randomUUID(),
+                eventId: hitData.eventId || crypto.randomUUID(),
                 timestamp: new Date(),
                 serviceName: hitData.serviceName,
                 endpoint: hitData.endpoint,

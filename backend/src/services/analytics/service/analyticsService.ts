@@ -168,10 +168,13 @@ export class AnalyticsService {
         const cachedData = await CacheService.get<{ isSuperAdmin: boolean; canViewAnalytics: boolean }>(cacheKey);
 
         if (cachedData) {
+            logger.debug('User Permissions Cache Hit', { userId });
             if (cachedData.isSuperAdmin) return true;
             if (cachedData.canViewAnalytics) return false;
             throw new AppError('Insufficient permissions to view analytics', 403);
         }
+
+        logger.debug('User Permissions Cache Miss, querying database', { userId });
 
         const isSuperAdmin = await this.authService.checkSuperAdminPermissions(userId);
         const profile = !isSuperAdmin ? await this.authService.getProfile(userId) : null;
