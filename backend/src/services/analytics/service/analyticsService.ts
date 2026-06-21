@@ -144,6 +144,8 @@ export class AnalyticsService {
         } else {
             startTime = new Date(filters.startTime);
         }
+        // Round to nearest 10 seconds to stabilize cache keys
+        startTime.setSeconds(Math.floor(startTime.getSeconds() / 10) * 10, 0);
 
         let endTime: Date;
         if (!filters.endTime) {
@@ -151,6 +153,8 @@ export class AnalyticsService {
         } else {
             endTime = new Date(filters.endTime);
         }
+        // Round to nearest 10 seconds to stabilize cache keys
+        endTime.setSeconds(Math.floor(endTime.getSeconds() / 10) * 10, 0);
 
         return { startTime, endTime };
     }
@@ -220,6 +224,9 @@ export class AnalyticsService {
         try {
             const { limit = 10, startTime } = options;
             const parsedStartTime = startTime ? new Date(startTime) : null;
+            if (parsedStartTime) {
+                parsedStartTime.setSeconds(Math.floor(parsedStartTime.getSeconds() / 10) * 10, 0);
+            }
 
             // 1. Check Redis Cache First
             const cacheKey = `analytics:top:${clientId ?? 'global'}:${limit}:${parsedStartTime ? parsedStartTime.getTime() : 'all'}`;
