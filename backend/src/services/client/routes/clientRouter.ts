@@ -1,12 +1,14 @@
 import express, { Request, Response, NextFunction } from "express";
 import clientDependencies from "../Dependencies/dependencies";
 import authenticate from "../../../shared/middlewares/authenticate";
+import { apiLimiter } from "../../../shared/middlewares/rateLimiter";
 
 const router = express.Router();
 
 const { clientController } = clientDependencies.controller;
 
 router.use(authenticate);
+router.use(apiLimiter);
 
 router.post("/admin/clients/onboard", (req: Request, res: Response, next: NextFunction) => 
     clientController.createClient(req, res, next)

@@ -6,6 +6,7 @@ import validate from "../../../shared/middlewares/validate";
 import requestLogger from "../../../shared/middlewares/requestLogger";
 import { onboardSuperAdminSchema, loginSchema, registrationSchema } from "../validation/authSchema";
 import { APPLICATION_ROLES } from "../../../shared/constants/roles";
+import { authLimiter } from "../../../shared/middlewares/rateLimiter";
 
 const router = express.Router();
 const { controller } = dependencies;
@@ -13,12 +14,14 @@ const authController = controller.authController;
 
 router.post("/onboard-super-admin",
     requestLogger,
+    authLimiter,
     validate(onboardSuperAdminSchema),
     (req: Request, res: Response, next: NextFunction) => authController.onboardSuperAdmin(req, res, next)
 );
 
 router.post("/register",
     requestLogger,
+    authLimiter,
     authenticate,
     authorize([APPLICATION_ROLES.SUPER_ADMIN]),
     validate(registrationSchema),
@@ -27,6 +30,7 @@ router.post("/register",
 
 router.post("/login",
     requestLogger,
+    authLimiter,
     validate(loginSchema),
     (req: Request, res: Response, next: NextFunction) => authController.login(req, res, next)
 );
