@@ -1,6 +1,6 @@
 import express, { Router } from "express";
 import ingestContainer from '../Dependencies/dependencies';
-import validateApiKey from '../../../shared/middlewares/valideApiKey';
+import validateApiKey from '../../../shared/middlewares/validateApiKey';
 import rateLimit from 'express-rate-limit';
 import config from '../../../shared/config/index';
 
