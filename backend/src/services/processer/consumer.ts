@@ -8,6 +8,8 @@ import { EVENT_TYPES } from '../../shared/events/eventContract';
 import { RetryStrategy, isRetryable } from '../../shared/events/producer/retryStrategy';
 import { CircuitBreaker } from '../../shared/events/producer/circuitBreaker';
 import { ProcessorService } from './service/processorService';
+import redisConnection from '../../shared/config/redis';
+import CacheService from '../../shared/service/cacheService';
 
 const messageSchema = z.object({
     type: z.enum([EVENT_TYPES.API_HIT]),
@@ -51,7 +53,6 @@ export class EventConsumer {
         dlqRouted: number;
         lastProcessedAt: Date | null;
     };
-    private processedIds: Set<string>;
     private poisonMessages: Map<string, number>;
 
     constructor({
@@ -72,7 +73,6 @@ export class EventConsumer {
         this.isRunning = false;
         this.channel = null;
         this.stats = { processed: 0, failed: 0, retried: 0, dlqRouted: 0, lastProcessedAt: null };
-        this.processedIds = new Set();
         this.poisonMessages = new Map();
     }
 
@@ -131,16 +131,18 @@ export class EventConsumer {
         while (retries < maxRetries) {
             try {
                 this.logger.info('Connecting to database via Prisma...');
-                
                 await dbConnection.connect();
-                
                 this.logger.info('Database connection established');
+                
+                this.logger.info('Connecting to Redis...');
+                await redisConnection.connect();
+                this.logger.info('Redis connection established');
                 return;
             } catch (error: any) {
                 retries++;
-                this.logger.error(`Database connection attempt ${retries} failed:`, error);
+                this.logger.error(`Database/Redis connection attempt ${retries} failed:`, error);
                 if (retries >= maxRetries) {
-                    throw new Error(`Failed to connect to database after ${maxRetries} attempts`);
+                    throw new Error(`Failed to connect to database/Redis after ${maxRetries} attempts`);
                 }
                 await new Promise(resolve => setTimeout(resolve, 5000 * retries));
             }
@@ -189,24 +191,25 @@ export class EventConsumer {
         let messageData: ParsedMessage | null = null;
         try {
             messageData = this.parseMessage(msg);
-            // Idempotency (Duplicate Prevention)
-            if (this.processedIds.has(messageData.messageId)) {
-                this.logger.debug('Duplicate message skipped', { messageId: messageData.messageId });
+            
+            // Idempotency Check (Duplicate Prevention using Redis)
+            const redisKey = `processed_msg:${messageData.messageId}`;
+            const hasBeenProcessed = await CacheService.get<boolean>(redisKey);
+            if (hasBeenProcessed) {
+                this.logger.info('Duplicate message skipped', { messageId: messageData.messageId });
                 this.channel.ack(msg);
                 return;
             }
+
             await this.processMessage(messageData);
             this.channel.ack(msg);
             this.circuitBreaker.onSuccess();
             this.stats.processed++;
             this.stats.lastProcessedAt = new Date();
-            this.processedIds.add(messageData.messageId);
-            if (this.processedIds.size > 100_000) {
-                const first = this.processedIds.values().next().value;
-                if (first !== undefined) {
-                    this.processedIds.delete(first);
-                }
-            }
+            
+            // Save to Redis to prevent duplicate processing (24-hour TTL)
+            await CacheService.set(redisKey, true, 86400);
+            
             this.poisonMessages.delete(messageData.type);
         } catch (error) {
             await this.handleProcessingError(error, msg, messageData, startTime);
@@ -334,7 +337,8 @@ export class EventConsumer {
 
             await Promise.all([
                 this.rabbitmq.close(),
-                dbConnection.close()
+                dbConnection.close(),
+                redisConnection.close()
             ]);
         } catch (error) {
             this.logger.error('Error stopping consumer:', error);

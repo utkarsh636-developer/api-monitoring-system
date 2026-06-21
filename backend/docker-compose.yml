@@ -87,6 +87,9 @@ services:
       RABBITMQ_URL: amqp://api_user:${RABBITMQ_PASSWORD:-utk_rabbitmq_password}@rabbitmq:5672/api_monitoring
       RABBITMQ_QUEUE: api_hits
       JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_here}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-utk_redis_password}
     volumes:
       - ./logs:/app/logs
     networks:
