@@ -24,3 +24,14 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@utility bg-stripes {
+  background-image: repeating-linear-gradient(
+    45deg,
+    currentColor,
+    currentColor 2px,
+    transparent 2px,
+    transparent 6px
+  );
+}
+

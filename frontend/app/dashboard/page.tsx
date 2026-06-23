@@ -3,9 +3,72 @@
 import React from 'react';
 import { useDashboard } from './layout';
 import MetricCard from '../../components/MetricCard';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
+
+// Custom tooltip matching Image 1
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-zinc-950/95 border border-zinc-800 rounded-xl p-3 shadow-xl text-xs font-sans min-w-[170px] select-none text-zinc-300">
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-2 mb-2 font-medium">
+          <span className="text-white text-sm font-semibold">{label}</span>
+          <span className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded text-[10px] font-bold">
+            +12.1%
+          </span>
+        </div>
+        <div className="space-y-1.5 font-medium">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded bg-indigo-500"></span>
+              <span>Requests</span>
+            </div>
+            <span className="font-bold text-white font-mono">{payload[0].value.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded bg-emerald-500"></span>
+              <span>Latency</span>
+            </div>
+            <span className="font-bold text-white font-mono">{payload[1].value} ms</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 export default function DashboardOverview() {
   const { user, selectedClientId } = useDashboard();
+
+  // Mock timeline data for the main Area + Line chart (Image 1)
+  const mockChartData = [
+    { time: 'Jan 23', requests: 2800, latency: 120 },
+    { time: 'Mar 23', requests: 2400, latency: 98 },
+    { time: 'May 23', requests: 1800, latency: 85 },
+    { time: 'Jul 23', requests: 2100, latency: 105 },
+    { time: 'Sep 23', requests: 2300, latency: 110 },
+    { time: 'Nov 23', requests: 3800, latency: 175 },
+    { time: 'Dec 23', requests: 3500, latency: 160 },
+  ];
 
   // Mock list of recent API hits (displays in Bento section)
   const mockRecentHits = [
@@ -16,22 +79,38 @@ export default function DashboardOverview() {
     { id: '5', method: 'GET', endpoint: '/api/analytics/stats', status: 401, latency: '12ms', service: 'auth-service', time: '15 mins ago' },
   ];
 
-  // Mock top endpoints data (displays with progress bars)
+  // Mock top endpoints data matching Image 2 (dual progress bars)
   const mockTopEndpoints = [
-    { path: '/api/analytics/dashboard', method: 'GET', hits: 24500, percentage: 75 },
-    { path: '/api/auth/login', method: 'POST', hits: 5200, percentage: 16 },
-    { path: '/api/clients/dashboard', method: 'GET', hits: 2100, percentage: 6 },
-    { path: '/api/admin/clients', method: 'POST', hits: 900, percentage: 3 },
+    { path: '/api/analytics/dashboard', method: 'GET', hits: 4879, prevHits: 1552, percentage: 75, prevPercentage: 25, trend: '↑ 214%' },
+    { path: '/api/auth/login', method: 'POST', hits: 5381, prevHits: 4274, percentage: 82, prevPercentage: 65, trend: '↑ 25%' },
+    { path: '/api/clients/dashboard', method: 'GET', hits: 3931, prevHits: 5014, percentage: 60, prevPercentage: 77, trend: '↓ 21%' },
+    { path: '/api/admin/clients', method: 'POST', hits: 6200, prevHits: 4350, percentage: 95, prevPercentage: 67, trend: '↑ 43%' },
   ];
 
-  // Style status codes
+  // Color mappings matching Image 2's specific rows
+  const endpointColors = [
+    { solid: 'bg-cyan-500', striped: 'bg-cyan-500/20 text-cyan-500', trend: 'text-emerald-600' },
+    { solid: 'bg-yellow-500', striped: 'bg-yellow-500/20 text-yellow-500', trend: 'text-emerald-600' },
+    { solid: 'bg-orange-500', striped: 'bg-orange-500/20 text-orange-500', trend: 'text-rose-600' },
+    { solid: 'bg-violet-600', striped: 'bg-violet-600/20 text-violet-500', trend: 'text-emerald-600' },
+  ];
+
+  // Mock status distribution matching Image 3 doughnut percentages
+  const mockStatusData = [
+    { name: '2xx Success', value: 55, color: '#7294c4' },
+    { name: '3xx Redirect', value: 25, color: '#88c0a3' },
+    { name: '4xx Client Error', value: 12, color: '#b3db18' },
+    { name: '5xx Server Error', value: 8, color: '#88a6a8' }
+  ];
+
+  // Style status codes in logs
   const getStatusColor = (code: number) => {
     if (code >= 200 && code < 300) return 'text-emerald-600 bg-emerald-50 border-emerald-100';
     if (code >= 400 && code < 500) return 'text-amber-600 bg-amber-50 border-amber-100';
     return 'text-rose-600 bg-rose-50 border-rose-100';
   };
 
-  // Style HTTP methods
+  // Style HTTP methods in logs
   const getMethodStyle = (method: string) => {
     switch (method) {
       case 'GET':
@@ -47,7 +126,7 @@ export default function DashboardOverview() {
 
   return (
     <div className="space-y-8 select-none">
-      {/* 1. Header welcome banner */}
+      {/* 1. Welcome Banner */}
       <div className="bg-gradient-to-r from-zinc-900 to-indigo-950 rounded-2xl p-6 text-white shadow-sm flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-tight">
@@ -86,7 +165,7 @@ export default function DashboardOverview() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           }
-          trend="-4.2%" // decrease in latency is positive (up/green)
+          trend="-4.2%"
           trendType="up"
           description="average speed"
         />
@@ -99,7 +178,7 @@ export default function DashboardOverview() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           }
-          trend="-0.12%" // decrease in error rate is positive (up/green)
+          trend="-0.12%"
           trendType="up"
           description="percentage failed"
         />
@@ -124,9 +203,9 @@ export default function DashboardOverview() {
         {/* Main Chart Area (2/3 width) */}
         <div className="lg:col-span-2 space-y-6">
           
-          {/* Main Chart Container */}
-          <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm min-h-[380px] flex flex-col">
-            <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
+          {/* Main Chart Container (Area Chart - Image 1) */}
+          <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm min-h-[380px] flex flex-col justify-between">
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-4 mb-4">
               <div>
                 <h3 className="text-base font-bold text-zinc-900">Traffic Volume & Performance Trend</h3>
                 <p className="text-zinc-500 text-xs mt-0.5 font-medium">Real-time latency spikes mapped against request volume</p>
@@ -139,17 +218,64 @@ export default function DashboardOverview() {
               </div>
             </div>
 
-            {/* Chart Graphic Placeholder */}
-            <div className="flex-1 flex flex-col items-center justify-center py-12 text-zinc-400">
-              <div className="h-12 w-12 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-500 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <p className="text-sm font-bold text-zinc-800">Chart Visualization Placeholder</p>
-              <p className="text-xs text-zinc-500 mt-1 max-w-xs text-center leading-relaxed">
-                Dual-Axis Recharts area graph displaying API traffic volume and average latencies will be integrated here.
-              </p>
+            {/* Recharts Area + Line Component */}
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={mockChartData}
+                  margin={{ top: 10, right: 5, left: -20, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="colorRequests" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="#f1f5f9" vertical={false} />
+                  <XAxis
+                    dataKey="time"
+                    stroke="#94a3b8"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                    dy={10}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    stroke="#94a3b8"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="#94a3b8"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1 }} />
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="requests"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorRequests)"
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="latency"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
@@ -202,61 +328,101 @@ export default function DashboardOverview() {
         {/* Right Columns (1/3 width) */}
         <div className="space-y-6">
           
-          {/* Status Code Breakdown Doughnut */}
+          {/* Status Code Breakdown Doughnut (Doughnut Chart - Image 3) */}
           <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm min-h-[220px] flex flex-col justify-between">
             <div>
               <h3 className="text-base font-bold text-zinc-900">Response Health</h3>
               <p className="text-zinc-500 text-xs mt-0.5 font-medium">Status code distribution ratio</p>
             </div>
             
-            {/* Visual breakdown simulation */}
-            <div className="py-4">
-              <div className="h-4 w-full bg-zinc-100 rounded-full flex overflow-hidden border border-zinc-200">
-                <div className="bg-emerald-500 h-full hover:opacity-90 transition-opacity" style={{ width: '98.5%' }} title="2xx Success"></div>
-                <div className="bg-amber-400 h-full hover:opacity-90 transition-opacity" style={{ width: '1.0%' }} title="4xx Client Error"></div>
-                <div className="bg-rose-500 h-full hover:opacity-90 transition-opacity" style={{ width: '0.5%' }} title="5xx Server Error"></div>
+            {/* Visual Doughnut Chart */}
+            <div className="flex items-center justify-center py-2">
+              <div className="h-32 w-32 relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={mockStatusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={38}
+                      outerRadius={56}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {mockStatusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} stroke="#fff" strokeWidth={2.5} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-              
-              <div className="grid grid-cols-3 gap-2 mt-4 text-xs font-medium">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                  <span className="text-zinc-600">2xx (98.5%)</span>
+            </div>
+
+            {/* Custom Legends */}
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[10px] font-semibold text-zinc-600 uppercase border-t border-zinc-100 pt-3">
+              {mockStatusData.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }}></span>
+                  <span className="truncate">{item.name} ({item.value}%)</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-amber-400"></span>
-                  <span className="text-zinc-600">4xx (1.0%)</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-right">
-                  <span className="h-2 w-2 rounded-full bg-rose-500"></span>
-                  <span className="text-zinc-600">5xx (0.5%)</span>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Top Endpoints (Horizontal Progress Bars) */}
+          {/* Top Endpoints (Stacked Progress Bars - Image 2) */}
           <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm">
             <div className="border-b border-zinc-100 pb-3 mb-4">
               <h3 className="text-base font-bold text-zinc-900">Top Endpoints</h3>
-              <p className="text-zinc-500 text-xs mt-0.5 font-medium">Most active API pathways</p>
+              <p className="text-zinc-500 text-xs mt-0.5 font-medium">Comparison of current vs previous hits volume</p>
             </div>
 
-            <div className="space-y-4">
-              {mockTopEndpoints.map((endpoint, index) => (
-                <div key={index} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="text-zinc-800 truncate max-w-[170px] font-mono">{endpoint.path}</span>
-                    <span className="text-zinc-500 font-mono">{endpoint.hits.toLocaleString()} hits</span>
+            <div className="space-y-5">
+              {mockTopEndpoints.map((endpoint, index) => {
+                const color = endpointColors[index] || endpointColors[0];
+                return (
+                  <div key={index} className="flex items-center gap-3">
+                    {/* Left Trend Indicators */}
+                    <div className="w-12 text-left">
+                      <span className={`text-[11px] font-bold ${color.trend}`}>
+                        {endpoint.trend}
+                      </span>
+                    </div>
+
+                    {/* Middle progress bars (Double stack) */}
+                    <div className="flex-1 space-y-1.5">
+                      <div className="text-xs font-semibold text-zinc-800 truncate font-mono max-w-[150px]">
+                        {endpoint.path}
+                      </div>
+
+                      {/* Top Bar (Striped - Previous Period hits) */}
+                      <div className="flex items-center gap-2">
+                        <div className="h-2.5 w-full bg-zinc-50 rounded-full overflow-hidden border border-zinc-200/40">
+                          <div
+                            className={`h-full rounded-full bg-stripes transition-all duration-500 ${color.striped}`}
+                            style={{ width: `${endpoint.prevPercentage}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-[10px] font-bold font-mono text-zinc-400 min-w-[28px] text-right">
+                          {endpoint.prevHits.toLocaleString()}
+                        </span>
+                      </div>
+
+                      {/* Bottom Bar (Solid - Current Period hits) */}
+                      <div className="flex items-center gap-2">
+                        <div className="h-2.5 w-full bg-zinc-50 rounded-full overflow-hidden border border-zinc-200/40">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${color.solid}`}
+                            style={{ width: `${endpoint.percentage}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-[10px] font-bold font-mono text-zinc-700 min-w-[28px] text-right">
+                          {endpoint.hits.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  {/* Custom progress bars exactly matching layout references */}
-                  <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden border border-zinc-200/50">
-                    <div 
-                      className="bg-indigo-600 h-full rounded-full transition-all duration-500" 
-                      style={{ width: `${endpoint.percentage}%` }}
-                    ></div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
