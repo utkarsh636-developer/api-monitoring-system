@@ -101,12 +101,17 @@ export interface ApiKey {
     isActive: boolean;
     createdAt: string;
     expiresAt?: string | null;
+    environment: 'PRODUCTION' | 'STAGING' | 'DEVELOPMENT' | 'TESTING';
+    description?: string | null;
 }
 
 export interface ApiKeyInput {
     name: string;
     expiresAt?: string;
+    environment?: 'PRODUCTION' | 'STAGING' | 'DEVELOPMENT' | 'TESTING';
+    description?: string;
 }
+
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
 
