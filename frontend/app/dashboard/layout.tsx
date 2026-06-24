@@ -45,18 +45,9 @@ export default function DashboardLayout({
           setUser(response.data);
         }
       } catch (err) {
-        console.warn('Authentication failed, using developer mock profile');
-        
-        // Development Bypassed State (since login/register pages are not built yet)
+        console.warn('Authentication failed, redirecting to login');
         if (active) {
-          setUser({
-            id: 'dev-user-id-999',
-            username: 'Utkarsh',
-            email: 'admin@apipulse.com',
-            role: 'SUPER_ADMIN', // Toggle this to 'CLIENT_ADMIN' to test different views
-            clientId: 'dev-client-id-999',
-            createdAt: new Date().toISOString(),
-          });
+          router.push('/login');
         }
       } finally {
         if (active) {
@@ -70,14 +61,13 @@ export default function DashboardLayout({
     return () => {
       active = false;
     };
-  }, []);
+  }, [router]);
 
   // 2. Global response interceptor listener (auth:unauthorized)
   useEffect(() => {
     const handleUnauthorized = () => {
-      // In production we would redirect:
-      // router.push('/login');
-      console.warn('Session expired - global event caught');
+      console.warn('Session expired - redirecting to login');
+      router.push('/login');
     };
 
     window.addEventListener('auth:unauthorized', handleUnauthorized);
@@ -93,8 +83,7 @@ export default function DashboardLayout({
       console.error('Logout error:', err);
     } finally {
       setUser(null);
-      // In production: router.push('/login');
-      alert('Logged out! (Mock redirection bypassed)');
+      router.push('/login');
     }
   };
 
