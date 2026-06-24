@@ -151,12 +151,16 @@ export const authApi = {
         const response = await api.post<ApiResponse<User>>('/auth/register', userData);
         return response.data;
     },
+    onboardSuperAdmin: async (userData: RegisterData): Promise<ApiResponse<User>> => {
+        const response = await api.post<ApiResponse<User>>('/auth/onboard-super-admin', userData);
+        return response.data;
+    },
     getProfile: async (options?: { signal?: AbortSignal }): Promise<ApiResponse<User>> => {
         const response = await api.get<ApiResponse<User>>('/auth/profile', { signal: options?.signal });
         return response.data;
     },
     logout: async (): Promise<ApiResponse<Record<string, never>>> => {
-        const response = await api.post<ApiResponse<Record<string, never>>>('/auth/logout');
+        const response = await api.get<ApiResponse<Record<string, never>>>('/auth/logout');
         return response.data;
     },
     updateProfile: async (profileData: Partial<User>): Promise<ApiResponse<User>> => {
@@ -224,6 +228,10 @@ export const clientApi = {
     },
     getClientApiKeys: async (clientId: string): Promise<ApiResponse<ApiKey[]>> => {
         const response = await api.get<ApiResponse<ApiKey[]>>(`/admin/clients/${clientId}/api-keys`);
+        return response.data;
+    },
+    createClientUser: async (clientId: string, userData: any): Promise<ApiResponse<any>> => {
+        const response = await api.post<ApiResponse<any>>(`/admin/clients/${clientId}/users`, userData);
         return response.data;
     },
 };
