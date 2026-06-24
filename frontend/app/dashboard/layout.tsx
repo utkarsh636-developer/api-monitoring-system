@@ -53,7 +53,7 @@ export default function DashboardLayout({
             id: 'dev-user-id-999',
             username: 'Utkarsh',
             email: 'admin@apipulse.com',
-            role: 'CLIENT_VIEWER', // Toggle this to 'CLIENT_ADMIN' to test different views
+            role: 'SUPER_ADMIN', // Toggle this to 'CLIENT_ADMIN' to test different views
             clientId: 'dev-client-id-999',
             createdAt: new Date().toISOString(),
           });
