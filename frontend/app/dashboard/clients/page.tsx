@@ -17,9 +17,20 @@ export default function ClientsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newClientName, setNewClientName] = useState('');
   const [newClientEmail, setNewClientEmail] = useState('');
+  const [newClientWebsite, setNewClientWebsite] = useState('');
   const [newClientRetention, setNewClientRetention] = useState<number>(30);
   const [newClientTimezone, setNewClientTimezone] = useState('UTC');
   const [newClientAlerts, setNewClientAlerts] = useState(true);
+
+  // User registration states
+  const [userModalClientId, setUserModalClientId] = useState<string | null>(null);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserRole, setNewUserRole] = useState<'CLIENT_ADMIN' | 'CLIENT_VIEWER'>('CLIENT_ADMIN');
+  const [userModalError, setUserModalError] = useState<string | null>(null);
+  const [userModalSuccess, setUserModalSuccess] = useState<string | null>(null);
+  const [userModalLoading, setUserModalLoading] = useState(false);
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
@@ -140,6 +151,7 @@ export default function ClientsPage() {
       name: newClientName,
       slug: clientSlug,
       email: newClientEmail,
+      website: newClientWebsite || null,
       isActive: true,
       dataRetentionDays: newClientRetention,
       timezone: newClientTimezone,
@@ -152,6 +164,7 @@ export default function ClientsPage() {
       const response = await clientApi.createClient({
         name: newClientName,
         email: newClientEmail,
+        website: newClientWebsite,
       });
       if (response.success && response.data) {
         newClientRecord.id = response.data.id;
@@ -166,6 +179,7 @@ export default function ClientsPage() {
     // Clear forms
     setNewClientName('');
     setNewClientEmail('');
+    setNewClientWebsite('');
     setNewClientRetention(30);
     setNewClientTimezone('UTC');
     setNewClientAlerts(true);
@@ -175,9 +189,57 @@ export default function ClientsPage() {
     setIsModalOpen(false);
     setNewClientName('');
     setNewClientEmail('');
+    setNewClientWebsite('');
     setNewClientRetention(30);
     setNewClientTimezone('UTC');
     setNewClientAlerts(true);
+  };
+
+  const handleRegisterUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userModalClientId) return;
+    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
+      setUserModalError('Please fill in all fields.');
+      return;
+    }
+
+    setUserModalLoading(true);
+    setUserModalError(null);
+    setUserModalSuccess(null);
+
+    try {
+      const response = await clientApi.createClientUser(userModalClientId, {
+        username: newUserName,
+        email: newUserEmail,
+        password: newUserPassword,
+        role: newUserRole,
+      });
+
+      if (response.success) {
+        setUserModalSuccess('User onboarded successfully!');
+        setTimeout(() => {
+          handleCloseUserModal();
+        }, 1500);
+      } else {
+        setUserModalError(response.message || 'Failed to onboard client user.');
+      }
+    } catch (err: any) {
+      console.error('Create user error:', err);
+      const errMsg = err.response?.data?.message || 'Error onboarding user. Validation check failed.';
+      setUserModalError(errMsg);
+    } finally {
+      setUserModalLoading(false);
+    }
+  };
+
+  const handleCloseUserModal = () => {
+    setUserModalClientId(null);
+    setNewUserName('');
+    setNewUserEmail('');
+    setNewUserPassword('');
+    setNewUserRole('CLIENT_ADMIN');
+    setUserModalError(null);
+    setUserModalSuccess(null);
   };
 
   // Access Control Screen
@@ -231,7 +293,7 @@ export default function ClientsPage() {
               <tr className="text-zinc-400 text-xs font-semibold uppercase tracking-wider border-b border-zinc-150 bg-zinc-50/50">
                 <th className="py-4 px-6 font-semibold">Name</th>
                 <th className="py-4 px-6 font-semibold">Slug</th>
-                <th className="py-4 px-6 font-semibold">Admin Email</th>
+                <th className="py-4 px-6 font-semibold">Contact Email</th>
                 <th className="py-4 px-6 font-semibold">Data Retention</th>
                 <th className="py-4 px-6 font-semibold">Status</th>
                 <th className="py-4 px-6 font-semibold text-right">Actions</th>
@@ -248,7 +310,19 @@ export default function ClientsPage() {
                 clients.map((client) => (
                   <tr key={client.id} className="hover:bg-zinc-50/30 transition-colors duration-150">
                     {/* Name */}
-                    <td className="py-4 px-6 font-bold text-zinc-900">{client.name}</td>
+                    <td className="py-4 px-6">
+                      <div className="font-bold text-zinc-900">{client.name}</div>
+                      {client.website && (
+                        <a
+                          href={client.website.startsWith('http') ? client.website : `https://${client.website}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-zinc-400 hover:text-indigo-600 transition-colors font-semibold mt-0.5 inline-block"
+                        >
+                          {client.website.replace(/https?:\/\//, '')}
+                        </a>
+                      )}
+                    </td>
 
                     {/* Slug */}
                     <td className="py-4 px-6">
@@ -294,6 +368,15 @@ export default function ClientsPage() {
                           ref={dropdownRef}
                           className="absolute right-6 mt-1 w-36 bg-white border border-zinc-200 rounded-xl shadow-lg z-20 py-1.5 text-left divide-y divide-zinc-50 text-xs font-semibold"
                         >
+                          <button
+                            onClick={() => {
+                              setUserModalClientId(client.id);
+                              setActiveMenuId(null);
+                            }}
+                            className="w-full px-4 py-2 hover:bg-zinc-50 text-indigo-600 flex items-center gap-2"
+                          >
+                            <span>Register User</span>
+                          </button>
                           <button
                             onClick={() => handleToggleStatus(client.id)}
                             className="w-full px-4 py-2 hover:bg-zinc-50 text-zinc-700 flex items-center gap-2"
@@ -371,6 +454,21 @@ export default function ClientsPage() {
                 />
               </div>
 
+              {/* Website Input */}
+              <div className="space-y-1.5">
+                <label htmlFor="clientWebsite" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider">
+                  Website URL
+                </label>
+                <input
+                  type="text"
+                  id="clientWebsite"
+                  placeholder="e.g. https://maps.google.com"
+                  value={newClientWebsite}
+                  onChange={(e) => setNewClientWebsite(e.target.value)}
+                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition placeholder-zinc-400 animate-none"
+                />
+              </div>
+
               {/* Data Retention selection */}
               <div className="space-y-1.5">
                 <label htmlFor="clientRetention" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider">
@@ -435,6 +533,129 @@ export default function ClientsPage() {
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm transition active:scale-[0.98]"
                 >
                   Register Client
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Registration Modal Overlay */}
+      {userModalClientId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center select-none font-sans">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-zinc-950/40 backdrop-blur-xs" onClick={handleCloseUserModal}></div>
+
+          {/* Modal Container */}
+          <div className="relative bg-white w-full max-w-md rounded-2xl border border-zinc-200 shadow-xl overflow-hidden z-10 p-6 animate-scale-in">
+            <form onSubmit={handleRegisterUser} className="space-y-5">
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+                <h3 className="text-base font-bold text-zinc-900">Register Client User</h3>
+                <button
+                  type="button"
+                  onClick={handleCloseUserModal}
+                  className="text-zinc-400 hover:text-zinc-600 transition-colors p-1"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Toast Messages */}
+              {userModalError && (
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-xs font-bold text-rose-600 flex items-center gap-2 animate-scale-in">
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                  {userModalError}
+                </div>
+              )}
+              {userModalSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-bold text-emerald-600 flex items-center gap-2 animate-scale-in">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                  {userModalSuccess}
+                </div>
+              )}
+
+              {/* Username Input */}
+              <div className="space-y-1.5">
+                <label htmlFor="userUsername" className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  id="userUsername"
+                  placeholder="e.g. client_admin_username"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  disabled={userModalLoading}
+                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition font-medium"
+                />
+              </div>
+
+              {/* Email Input */}
+              <div className="space-y-1.5">
+                <label htmlFor="userEmail" className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  id="userEmail"
+                  placeholder="user@company.com"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  disabled={userModalLoading}
+                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition font-medium"
+                />
+              </div>
+
+              {/* Password Input */}
+              <div className="space-y-1.5">
+                <label htmlFor="userPassword" className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  id="userPassword"
+                  placeholder="••••••••"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  disabled={userModalLoading}
+                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition font-medium"
+                />
+              </div>
+
+              {/* Role Select Dropdown */}
+              <div className="space-y-1.5">
+                <label htmlFor="userRole" className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  Platform Role
+                </label>
+                <select
+                  id="userRole"
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value as any)}
+                  disabled={userModalLoading}
+                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition font-medium"
+                >
+                  <option value="CLIENT_ADMIN">Client Admin (View & Configure)</option>
+                  <option value="CLIENT_VIEWER">Client Viewer (Read Only)</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-3 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={handleCloseUserModal}
+                  disabled={userModalLoading}
+                  className="px-4 py-2 border border-zinc-200 text-zinc-500 hover:text-zinc-700 rounded-xl text-sm font-semibold transition hover:bg-zinc-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={userModalLoading}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl text-sm font-semibold shadow-sm transition active:scale-[0.98]"
+                >
+                  {userModalLoading ? 'Creating User...' : 'Create User'}
                 </button>
               </div>
             </form>
