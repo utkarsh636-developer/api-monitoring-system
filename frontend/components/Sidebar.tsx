@@ -43,7 +43,7 @@ export default function Sidebar({ user, onLogout }: SidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m0 0a2 2 0 01-2 2m2-2h3m-3 0H9M3 12a9 9 0 0115 0M3 12a9 9 0 0015 0M3 12A9 9 0 1118 12M3 12a9 9 0 1015 0" />
         </svg>
       ),
-      roles: ['SUPER_ADMIN', 'CLIENT_ADMIN'], // Client Admin & Super Admin
+      roles: ['SUPER_ADMIN', 'CLIENT_ADMIN', 'CLIENT_VIEWER'], // Client Admin, Super Admin & Client Viewer
     },
     {
       name: 'Settings',
