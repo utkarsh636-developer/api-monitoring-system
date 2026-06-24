@@ -85,7 +85,7 @@ export class AuthService {
     }
 
     async register(
-        userData: Prisma.UserCreateInput
+        userData: any
     ): Promise<{ user: Omit<User, 'passwordHash'>; token: string }> {
         try {
             const existingUser = await this.userRepository.findByUsername(userData.username);
@@ -98,7 +98,19 @@ export class AuthService {
                 throw new AppError("Email already exists", 409);
             }
 
-            const user = await this.userRepository.create(userData);
+            const { username, email, password, role } = userData;
+            if (!password) {
+                throw new AppError("Password is required", 400);
+            }
+
+            const passwordHash = await bcrypt.hash(password, 10);
+
+            const user = await this.userRepository.create({
+                username,
+                email,
+                passwordHash,
+                role
+            });
             const token = this.generateToken(user);
 
             logger.info("User registered successfully", {
