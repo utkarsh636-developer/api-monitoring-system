@@ -50,19 +50,22 @@ export interface DashboardStats {
 export interface TopEndpoint {
     endpoint: string;
     method: string;
-    hits: number;
+    totalHits: number;
     avgLatency: number;
     errorRate: number;
 }
 
 export interface RecentActivity {
-    id: string;
+    id?: string;
     serviceName: string;
     endpoint: string;
     method: string;
-    statusCode: number;
-    latencyMs: number;
-    timestamp: string;
+    totalHits: number;
+    errorHits: number;
+    avgLatency: number;
+    minLatency: number;
+    maxLatency: number;
+    timeBucket: string;
 }
 
 export interface DashboardData {
@@ -170,8 +173,17 @@ export const authApi = {
 };
 
 export const analyticsApi = {
-    getDashboard: async (clientId?: string): Promise<ApiResponse<DashboardData>> => {
-        const params = clientId && clientId !== 'all' ? { clientId } : {};
+    getDashboard: async (clientId?: string, startTime?: string, endTime?: string): Promise<ApiResponse<DashboardData>> => {
+        const params: Record<string, any> = {};
+        if (clientId && clientId !== 'all') {
+            params.clientId = clientId;
+        }
+        if (startTime) {
+            params.startTime = startTime;
+        }
+        if (endTime) {
+            params.endTime = endTime;
+        }
         const response = await api.get<ApiResponse<DashboardData>>('/analytics/dashboard', { params });
         const payload = response.data || {};
 
