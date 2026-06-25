@@ -170,8 +170,9 @@ export const authApi = {
 };
 
 export const analyticsApi = {
-    getDashboard: async (): Promise<ApiResponse<DashboardData>> => {
-        const response = await api.get<ApiResponse<DashboardData>>('/analytics/dashboard');
+    getDashboard: async (clientId?: string): Promise<ApiResponse<DashboardData>> => {
+        const params = clientId && clientId !== 'all' ? { clientId } : {};
+        const response = await api.get<ApiResponse<DashboardData>>('/analytics/dashboard', { params });
         const payload = response.data || {};
 
         if (payload.success && payload.data) {
