@@ -120,17 +120,40 @@ export default function ClientsPage() {
   }, []);
 
   // Toggle active/inactive status
-  const handleToggleStatus = (id: string) => {
-    setClients(prev =>
-      prev.map(c => (c.id === id ? { ...c, isActive: !c.isActive } : c))
-    );
+  const handleToggleStatus = async (id: string) => {
+    const client = clients.find(c => c.id === id);
+    if (!client) return;
+
+    try {
+      const response = await clientApi.updateClient(id, { isActive: !client.isActive });
+      if (response.success && response.data) {
+        setClients(prev =>
+          prev.map(c => (c.id === id ? response.data! : c))
+        );
+      } else {
+        alert(response.message || 'Failed to toggle client status.');
+      }
+    } catch (err) {
+      console.error('Failed to toggle status:', err);
+      alert('An error occurred while updating the client status.');
+    }
     setActiveMenuId(null);
   };
 
   // Delete Client
-  const handleDeleteClient = (id: string) => {
+  const handleDeleteClient = async (id: string) => {
     if (confirm('Are you sure you want to delete this client company? All associated API keys, logs, and users will be permanently deleted.')) {
-      setClients(prev => prev.filter(c => c.id !== id));
+      try {
+        const response = await clientApi.deleteClient(id);
+        if (response.success) {
+          setClients(prev => prev.filter(c => c.id !== id));
+        } else {
+          alert(response.message || 'Failed to delete client.');
+        }
+      } catch (err) {
+        console.error('Failed to delete client:', err);
+        alert('An error occurred while deleting the client.');
+      }
       setActiveMenuId(null);
     }
   };

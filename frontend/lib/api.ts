@@ -247,6 +247,14 @@ export const clientApi = {
         const response = await api.post<ApiResponse<any>>(`/admin/clients/${clientId}/users`, userData);
         return response.data;
     },
+    updateClient: async (clientId: string, clientData: Partial<Client>): Promise<ApiResponse<Client>> => {
+        const response = await api.put<ApiResponse<Client>>(`/admin/clients/${clientId}`, clientData);
+        return response.data;
+    },
+    deleteClient: async (clientId: string): Promise<ApiResponse<Client>> => {
+        const response = await api.delete<ApiResponse<Client>>(`/admin/clients/${clientId}`);
+        return response.data;
+    },
 };
 
 export default api;
