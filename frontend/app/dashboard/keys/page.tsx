@@ -10,8 +10,11 @@ interface ApiKeyUI extends ApiKey {
 }
 
 export default function ApiKeysPage() {
-  const { user } = useDashboard();
+  const { user, selectedClientId, clients } = useDashboard();
   const canManageKeys = user?.role === 'SUPER_ADMIN' || user?.role === 'CLIENT_ADMIN';
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const targetClientId = isSuperAdmin ? selectedClientId : user?.clientId;
+
   const [keys, setKeys] = useState<ApiKeyUI[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,14 +32,19 @@ export default function ApiKeysPage() {
   // Fetch client API keys
   useEffect(() => {
     let active = true;
+    setLoading(true);
 
     async function fetchKeys() {
+      if (!targetClientId || targetClientId === 'all') {
+        setKeys([]);
+        setLoading(false);
+        return;
+      }
+
       try {
-        if (user?.clientId) {
-          const response = await clientApi.getClientApiKeys(user.clientId);
-          if (response.success && response.data && active) {
-            setKeys(response.data.map(k => ({ ...k, revealed: false })));
-          }
+        const response = await clientApi.getClientApiKeys(targetClientId);
+        if (response.success && response.data && active) {
+          setKeys(response.data.map(k => ({ ...k, revealed: false })));
         }
       } catch (err) {
         console.error('Failed to fetch API keys from backend:', err);
@@ -55,7 +63,7 @@ export default function ApiKeysPage() {
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [user, targetClientId]);
 
   // Copy to clipboard helper
   const handleCopy = (id: string, text: string) => {
@@ -73,12 +81,12 @@ export default function ApiKeysPage() {
 
   // Toggle active/inactive status
   const handleToggleStatus = async (id: string) => {
-    if (!user?.clientId) return;
+    if (!targetClientId || targetClientId === 'all') return;
     const key = keys.find(k => k.id === id);
     if (!key) return;
 
     try {
-      const response = await clientApi.updateApiKey(user.clientId, id, { isActive: !key.isActive });
+      const response = await clientApi.updateApiKey(targetClientId, id, { isActive: !key.isActive });
       if (response.success && response.data) {
         setKeys(prev =>
           prev.map(k => (k.id === id ? { ...response.data!, revealed: key.revealed } : k))
@@ -94,10 +102,10 @@ export default function ApiKeysPage() {
 
   // Revoke/Delete API Key
   const handleRevokeKey = async (id: string) => {
-    if (!user?.clientId) return;
+    if (!targetClientId || targetClientId === 'all') return;
     if (confirm('Are you sure you want to revoke this API key? This action is permanent and will break any services currently using it.')) {
       try {
-        const response = await clientApi.deleteApiKey(user.clientId, id);
+        const response = await clientApi.deleteApiKey(targetClientId, id);
         if (response.success) {
           setKeys(prev => prev.filter(k => k.id !== id));
         } else {
@@ -113,13 +121,13 @@ export default function ApiKeysPage() {
   // Create new API key
   const handleCreateKey = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newKeyName.trim() || !user?.clientId) return;
+    if (!newKeyName.trim() || !targetClientId || targetClientId === 'all') return;
 
     setCreateLoading(true);
     setCreateError(null);
 
     try {
-      const response = await clientApi.createApiKey(user.clientId, {
+      const response = await clientApi.createApiKey(targetClientId, {
         name: newKeyName,
         environment: newKeyEnv,
         expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
@@ -160,6 +168,33 @@ export default function ApiKeysPage() {
         return 'bg-zinc-100 text-zinc-600 border border-zinc-200';
     }
   };
+  const selectedClient = clients.find(c => c.id === selectedClientId);
+
+  if (isSuperAdmin && (!selectedClientId || selectedClientId === 'all')) {
+    return (
+      <div className="space-y-6 select-none font-sans">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-zinc-900">API keys</h2>
+            <p className="text-zinc-500 text-sm mt-0.5 font-medium">
+              Manage credentials for authenticating your backend client servers and services.
+            </p>
+          </div>
+        </div>
+        <div className="bg-white border border-zinc-200 rounded-2xl p-8 text-center shadow-sm">
+          <div className="mx-auto h-12 w-12 rounded-full bg-zinc-50 border border-zinc-100 flex items-center justify-center text-zinc-400 mb-3 animate-pulse">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </div>
+          <h3 className="text-sm font-bold text-zinc-800">No Organization Selected</h3>
+          <p className="text-xs text-zinc-500 mt-1 max-w-xs mx-auto leading-relaxed font-medium">
+            Please choose a specific organization from the top-right header dropdown to view, create, or revoke its API keys.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -176,7 +211,9 @@ export default function ApiKeysPage() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-zinc-900">API keys</h2>
           <p className="text-zinc-500 text-sm mt-0.5 font-medium">
-            Manage credentials for authenticating your backend client servers and services.
+            {isSuperAdmin && selectedClient
+              ? `Managing credentials for client organization: ${selectedClient.name}`
+              : 'Manage credentials for authenticating your backend client servers and services.'}
           </p>
         </div>
         {canManageKeys && (
@@ -217,9 +254,11 @@ export default function ApiKeysPage() {
                     <td className="py-4 px-6 font-bold text-zinc-900">{key.name}</td>
 
                     {/* Key Pill with Copy & Eye icon (Twelvedata layout) */}
-                    <td className="py-4 px-6">
+                    <td className="py-4 px-6 max-w-[340px]">
                       <div className="flex items-center gap-3">
-                        <div className="bg-zinc-100/80 px-3.5 py-1.5 rounded-full border border-zinc-200/50 font-mono text-xs text-zinc-600 tracking-wide select-text">
+                        <div className={`bg-zinc-100/80 px-3.5 py-1.5 rounded-xl border border-zinc-200/50 font-mono text-xs text-zinc-600 tracking-wide select-all max-w-[260px] ${
+                          key.revealed ? 'break-all whitespace-normal' : 'truncate'
+                        }`}>
                           {key.revealed && key.key
                             ? key.key
                             : key.key
@@ -227,47 +266,51 @@ export default function ApiKeysPage() {
                               : '••••••••••••••••••••••••••••••••'}
                         </div>
                         
-                        {/* Toggle visibility (Eye) */}
-                        <button
-                          onClick={() => toggleReveal(key.id)}
-                          className="text-zinc-400 hover:text-zinc-700 transition-colors p-1"
-                          title={key.revealed ? 'Mask key' : 'Reveal key'}
-                        >
-                          {key.revealed ? (
-                            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                            </svg>
-                          ) : (
-                            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          )}
-                        </button>
-
-                        {/* Copy button */}
-                        <div className="relative">
+                        {/* Toggle visibility (Eye) - Only render if the key value is available (newly created key) */}
+                        {key.key && key.key !== '' && (
                           <button
-                            onClick={() => handleCopy(key.id, key.key)}
+                            onClick={() => toggleReveal(key.id)}
                             className="text-zinc-400 hover:text-zinc-700 transition-colors p-1"
-                            title="Copy key"
+                            title={key.revealed ? 'Mask key' : 'Reveal key'}
                           >
-                            {copiedKeyId === key.id ? (
-                              <svg className="w-4.5 h-4.5 text-emerald-600 animate-scale-in" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            {key.revealed ? (
+                              <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                               </svg>
                             ) : (
                               <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                               </svg>
                             )}
                           </button>
-                          {copiedKeyId === key.id && (
-                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-0.5 bg-zinc-900 text-white text-[10px] rounded shadow-lg whitespace-nowrap z-10 animate-fade-in font-bold">
-                              Copied!
-                            </span>
-                          )}
-                        </div>
+                        )}
+
+                        {/* Copy button - Only render if the key value is available */}
+                        {key.key && key.key !== '' && (
+                          <div className="relative">
+                            <button
+                              onClick={() => handleCopy(key.id, key.key)}
+                              className="text-zinc-400 hover:text-zinc-700 transition-colors p-1"
+                              title="Copy key"
+                            >
+                              {copiedKeyId === key.id ? (
+                                <svg className="w-4.5 h-4.5 text-emerald-600 animate-scale-in" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                </svg>
+                              )}
+                            </button>
+                            {copiedKeyId === key.id && (
+                              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-0.5 bg-zinc-900 text-white text-[10px] rounded shadow-lg whitespace-nowrap z-10 animate-fade-in font-bold">
+                                Copied!
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </td>
 
