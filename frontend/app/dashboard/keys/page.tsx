@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDashboard } from '../layout';
 import { clientApi, ApiKey } from '../../../lib/api';
 
@@ -14,10 +14,6 @@ export default function ApiKeysPage() {
   const canManageKeys = user?.role === 'SUPER_ADMIN' || user?.role === 'CLIENT_ADMIN';
   const [keys, setKeys] = useState<ApiKeyUI[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Actions dropdown states
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   // Copy success animation states
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
@@ -61,17 +57,6 @@ export default function ApiKeysPage() {
     };
   }, [user]);
 
-  // Click outside listener to close dropdowns
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setActiveMenuId(null);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   // Copy to clipboard helper
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -105,7 +90,6 @@ export default function ApiKeysPage() {
       console.error('Failed to toggle key status:', err);
       alert('An error occurred while updating the API key status.');
     }
-    setActiveMenuId(null);
   };
 
   // Revoke/Delete API Key
@@ -123,7 +107,6 @@ export default function ApiKeysPage() {
         console.error('Failed to revoke key:', err);
         alert('An error occurred while revoking the API key.');
       }
-      setActiveMenuId(null);
     }
   };
 
@@ -228,7 +211,7 @@ export default function ApiKeysPage() {
                   </td>
                 </tr>
               ) : (
-                keys.map((key) => (
+                keys.map((key, index) => (
                   <tr key={key.id} className="hover:bg-zinc-50/30 transition-colors duration-150">
                     {/* Name */}
                     <td className="py-4 px-6 font-bold text-zinc-900">{key.name}</td>
@@ -314,38 +297,27 @@ export default function ApiKeysPage() {
                       </span>
                     </td>
 
-                    {/* Custom Context Menu Actions Dropdown */}
+                    {/* Inline Action Buttons */}
                     {canManageKeys && (
-                      <td className="py-4 px-6 text-right relative">
-                        <button
-                          onClick={() => setActiveMenuId(activeMenuId === key.id ? null : key.id)}
-                          className="text-zinc-400 hover:text-zinc-700 transition-colors p-1"
-                        >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-                          </svg>
-                        </button>
-
-                        {/* Dropdown Box overlay */}
-                        {activeMenuId === key.id && (
-                          <div
-                            ref={dropdownRef}
-                            className="absolute right-6 mt-1 w-36 bg-white border border-zinc-200 rounded-xl shadow-lg z-20 py-1.5 text-left divide-y divide-zinc-50 text-xs font-semibold"
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleToggleStatus(key.id)}
+                            className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition active:scale-[0.98] ${
+                              key.isActive
+                                ? 'text-zinc-600 bg-zinc-50 border-zinc-200 hover:bg-zinc-100'
+                                : 'text-emerald-600 bg-emerald-50 border-emerald-100 hover:bg-emerald-100'
+                            }`}
                           >
-                            <button
-                              onClick={() => handleToggleStatus(key.id)}
-                              className="w-full px-4 py-2 hover:bg-zinc-50 text-zinc-700 flex items-center gap-2"
-                            >
-                              <span>{key.isActive ? 'Deactivate' : 'Activate'}</span>
-                            </button>
-                            <button
-                              onClick={() => handleRevokeKey(key.id)}
-                              className="w-full px-4 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2"
-                            >
-                              <span>Revoke Key</span>
-                            </button>
-                          </div>
-                        )}
+                            {key.isActive ? 'Deactivate' : 'Activate'}
+                          </button>
+                          <button
+                            onClick={() => handleRevokeKey(key.id)}
+                            className="px-2.5 py-1 text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-100 rounded-lg hover:bg-rose-100 transition active:scale-[0.98]"
+                          >
+                            Revoke
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDashboard } from '../layout';
 import { clientApi, Client } from '../../../lib/api';
 
@@ -8,10 +8,6 @@ export default function ClientsPage() {
   const { user } = useDashboard();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Actions dropdown states
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   // Modal registration states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,17 +64,6 @@ export default function ClientsPage() {
     };
   }, [user, isSuperAdmin]);
 
-  // Click outside listener to close dropdowns
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setActiveMenuId(null);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   // Toggle active/inactive status
   const handleToggleStatus = async (id: string) => {
     const client = clients.find(c => c.id === id);
@@ -97,7 +82,6 @@ export default function ClientsPage() {
       console.error('Failed to toggle status:', err);
       alert('An error occurred while updating the client status.');
     }
-    setActiveMenuId(null);
   };
 
   // Delete Client
@@ -114,7 +98,6 @@ export default function ClientsPage() {
         console.error('Failed to delete client:', err);
         alert('An error occurred while deleting the client.');
       }
-      setActiveMenuId(null);
     }
   };
 
@@ -254,7 +237,6 @@ export default function ClientsPage() {
                 <th className="py-4 px-6 font-semibold">Name</th>
                 <th className="py-4 px-6 font-semibold">Slug</th>
                 <th className="py-4 px-6 font-semibold">Contact Email</th>
-                <th className="py-4 px-6 font-semibold">Data Retention</th>
                 <th className="py-4 px-6 font-semibold">Status</th>
                 <th className="py-4 px-6 font-semibold text-right">Actions</th>
               </tr>
@@ -262,12 +244,12 @@ export default function ClientsPage() {
             <tbody className="divide-y divide-zinc-100 text-zinc-700 font-medium">
               {clients.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-zinc-400">
+                  <td colSpan={5} className="py-8 text-center text-zinc-400">
                     No active clients found. Click "Register Client" to add one.
                   </td>
                 </tr>
               ) : (
-                clients.map((client) => (
+                clients.map((client, index) => (
                   <tr key={client.id} className="hover:bg-zinc-50/30 transition-colors duration-150">
                     {/* Name */}
                     <td className="py-4 px-6">
@@ -294,11 +276,6 @@ export default function ClientsPage() {
                     {/* Contact Email */}
                     <td className="py-4 px-6 text-zinc-600 font-medium">{client.email}</td>
 
-                    {/* Data Retention days */}
-                    <td className="py-4 px-6 text-zinc-500 font-mono text-xs">
-                      {client.dataRetentionDays} Days
-                    </td>
-
                     {/* Status Badge */}
                     <td className="py-4 px-6">
                       <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full border ${
@@ -311,46 +288,32 @@ export default function ClientsPage() {
                       </span>
                     </td>
 
-                    {/* Context Menu Actions Dropdown */}
-                    <td className="py-4 px-6 text-right relative">
-                      <button
-                        onClick={() => setActiveMenuId(activeMenuId === client.id ? null : client.id)}
-                        className="text-zinc-400 hover:text-zinc-700 transition-colors p-1"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-                        </svg>
-                      </button>
-
-                      {/* Dropdown Box overlay */}
-                      {activeMenuId === client.id && (
-                        <div
-                          ref={dropdownRef}
-                          className="absolute right-6 mt-1 w-36 bg-white border border-zinc-200 rounded-xl shadow-lg z-20 py-1.5 text-left divide-y divide-zinc-50 text-xs font-semibold"
+                    {/* Inline Action Buttons */}
+                    <td className="py-4 px-6 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setUserModalClientId(client.id)}
+                          className="px-2.5 py-1 text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition active:scale-[0.98]"
                         >
-                          <button
-                            onClick={() => {
-                              setUserModalClientId(client.id);
-                              setActiveMenuId(null);
-                            }}
-                            className="w-full px-4 py-2 hover:bg-zinc-50 text-indigo-600 flex items-center gap-2"
-                          >
-                            <span>Register User</span>
-                          </button>
-                          <button
-                            onClick={() => handleToggleStatus(client.id)}
-                            className="w-full px-4 py-2 hover:bg-zinc-50 text-zinc-700 flex items-center gap-2"
-                          >
-                            <span>{client.isActive ? 'Deactivate' : 'Activate'}</span>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClient(client.id)}
-                            className="w-full px-4 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2"
-                          >
-                            <span>Delete Client</span>
-                          </button>
-                        </div>
-                      )}
+                          Register User
+                        </button>
+                        <button
+                          onClick={() => handleToggleStatus(client.id)}
+                          className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition active:scale-[0.98] ${
+                            client.isActive
+                              ? 'text-zinc-600 bg-zinc-50 border-zinc-200 hover:bg-zinc-100'
+                              : 'text-emerald-600 bg-emerald-50 border-emerald-100 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {client.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClient(client.id)}
+                          className="px-2.5 py-1 text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-100 rounded-lg hover:bg-rose-100 transition active:scale-[0.98]"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
