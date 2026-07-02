@@ -236,19 +236,33 @@ export const clientApi = {
         return response.data;
     },
     createApiKey: async (clientId: string, keyData: ApiKeyInput): Promise<ApiResponse<ApiKey>> => {
-        const response = await api.post<ApiResponse<ApiKey>>(`/admin/clients/${clientId}/api/keys`, keyData);
+        const response = await api.post<ApiResponse<any>>(`/admin/clients/${clientId}/api/keys`, keyData);
+        if (response.data?.success && response.data?.data) {
+            response.data.data.key = response.data.data.keyValue;
+        }
         return response.data;
     },
     getClientApiKeys: async (clientId: string): Promise<ApiResponse<ApiKey[]>> => {
-        const response = await api.get<ApiResponse<ApiKey[]>>(`/admin/clients/${clientId}/api/keys`);
+        const response = await api.get<ApiResponse<any>>(`/admin/clients/${clientId}/api/keys`);
+        if (response.data?.success && Array.isArray(response.data?.data)) {
+            response.data.data.forEach((item: any) => {
+                item.key = item.keyValue || '';
+            });
+        }
         return response.data;
     },
     updateApiKey: async (clientId: string, keyId: string, keyData: Partial<ApiKey>): Promise<ApiResponse<ApiKey>> => {
-        const response = await api.put<ApiResponse<ApiKey>>(`/admin/clients/${clientId}/api/keys/${keyId}`, keyData);
+        const response = await api.put<ApiResponse<any>>(`/admin/clients/${clientId}/api/keys/${keyId}`, keyData);
+        if (response.data?.success && response.data?.data) {
+            response.data.data.key = response.data.data.keyValue;
+        }
         return response.data;
     },
     deleteApiKey: async (clientId: string, keyId: string): Promise<ApiResponse<ApiKey>> => {
-        const response = await api.delete<ApiResponse<ApiKey>>(`/admin/clients/${clientId}/api/keys/${keyId}`);
+        const response = await api.delete<ApiResponse<any>>(`/admin/clients/${clientId}/api/keys/${keyId}`);
+        if (response.data?.success && response.data?.data) {
+            response.data.data.key = response.data.data.keyValue;
+        }
         return response.data;
     },
     createClientUser: async (clientId: string, userData: any): Promise<ApiResponse<any>> => {

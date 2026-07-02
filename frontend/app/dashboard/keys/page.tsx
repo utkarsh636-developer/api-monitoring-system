@@ -220,9 +220,11 @@ export default function ApiKeysPage() {
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
                         <div className="bg-zinc-100/80 px-3.5 py-1.5 rounded-full border border-zinc-200/50 font-mono text-xs text-zinc-600 tracking-wide select-text">
-                          {key.revealed
+                          {key.revealed && key.key
                             ? key.key
-                            : `${key.key.substring(0, 9)}••••••••••••••••••••${key.key.slice(-4)}`}
+                            : key.key
+                              ? `${key.key.substring(0, 9)}••••••••••••••••••••${key.key.slice(-4)}`
+                              : '••••••••••••••••••••••••••••••••'}
                         </div>
                         
                         {/* Toggle visibility (Eye) */}
