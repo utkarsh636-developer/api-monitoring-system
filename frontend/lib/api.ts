@@ -236,11 +236,11 @@ export const clientApi = {
         return response.data;
     },
     createApiKey: async (clientId: string, keyData: ApiKeyInput): Promise<ApiResponse<ApiKey>> => {
-        const response = await api.post<ApiResponse<ApiKey>>(`/admin/clients/${clientId}/api-keys`, keyData);
+        const response = await api.post<ApiResponse<ApiKey>>(`/admin/clients/${clientId}/api/keys`, keyData);
         return response.data;
     },
     getClientApiKeys: async (clientId: string): Promise<ApiResponse<ApiKey[]>> => {
-        const response = await api.get<ApiResponse<ApiKey[]>>(`/admin/clients/${clientId}/api-keys`);
+        const response = await api.get<ApiResponse<ApiKey[]>>(`/admin/clients/${clientId}/api/keys`);
         return response.data;
     },
     createClientUser: async (clientId: string, userData: any): Promise<ApiResponse<any>> => {

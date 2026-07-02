@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { authApi, User, Client } from '../../lib/api';
+import { authApi, clientApi, User, Client } from '../../lib/api';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
 
@@ -87,36 +87,25 @@ export default function DashboardLayout({
     }
   };
 
-  // Mock list of clients (for Super Admin selector preview)
+  // Fetch real list of clients (for Super Admin selector)
   useEffect(() => {
+    let active = true;
     if (user?.role === 'SUPER_ADMIN') {
-      setClients([
-        {
-          id: 'dev-client-id-999',
-          name: 'Code Architecture',
-          slug: 'code-architecture',
-          email: 'info@codearc.com',
-          isActive: true,
-          dataRetentionDays: 30,
-          alertsEnabled: true,
-          timezone: 'UTC',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: 'client-beta-id',
-          name: 'FoodDelivery API Corp',
-          slug: 'food-delivery',
-          email: 'api@fooddelivery.com',
-          isActive: true,
-          dataRetentionDays: 14,
-          alertsEnabled: false,
-          timezone: 'EST',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ]);
+      async function fetchClients() {
+        try {
+          const response = await clientApi.getClients();
+          if (response.success && response.data && active) {
+            setClients(response.data);
+          }
+        } catch (err) {
+          console.error('Failed to fetch clients for header dropdown:', err);
+        }
+      }
+      fetchClients();
     }
+    return () => {
+      active = false;
+    };
   }, [user]);
 
   if (loading) {
