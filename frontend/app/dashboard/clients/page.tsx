@@ -18,9 +18,8 @@ export default function ClientsPage() {
   const [newClientName, setNewClientName] = useState('');
   const [newClientEmail, setNewClientEmail] = useState('');
   const [newClientWebsite, setNewClientWebsite] = useState('');
-  const [newClientRetention, setNewClientRetention] = useState<number>(30);
-  const [newClientTimezone, setNewClientTimezone] = useState('UTC');
-  const [newClientAlerts, setNewClientAlerts] = useState(true);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [registerLoading, setRegisterLoading] = useState(false);
 
   // User registration states
   const [userModalClientId, setUserModalClientId] = useState<string | null>(null);
@@ -51,48 +50,9 @@ export default function ClientsPage() {
           setClients(response.data);
         }
       } catch (err) {
-        console.warn('Backend clients fetch failed, loading developer mock directory');
-        
-        // Mock fallback directory in development
+        console.error('Failed to fetch clients from backend:', err);
         if (active) {
-          setClients([
-            {
-              id: 'dev-client-id-999',
-              name: 'Code Architecture',
-              slug: 'code-architecture',
-              email: 'info@codearc.com',
-              isActive: true,
-              dataRetentionDays: 30,
-              alertsEnabled: true,
-              timezone: 'UTC',
-              createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
-              updatedAt: new Date().toISOString(),
-            },
-            {
-              id: 'client-beta-id',
-              name: 'FoodDelivery API Corp',
-              slug: 'food-delivery',
-              email: 'api@fooddelivery.com',
-              isActive: true,
-              dataRetentionDays: 14,
-              alertsEnabled: false,
-              timezone: 'EST',
-              createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-              updatedAt: new Date().toISOString(),
-            },
-            {
-              id: 'client-gamma-id',
-              name: 'SuperShop E-Commerce',
-              slug: 'supershop',
-              email: 'admin@supershop.io',
-              isActive: false,
-              dataRetentionDays: 90,
-              alertsEnabled: true,
-              timezone: 'GMT',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            },
-          ]);
+          setClients([]);
         }
       } finally {
         if (active) {
@@ -163,49 +123,28 @@ export default function ClientsPage() {
     e.preventDefault();
     if (!newClientName.trim() || !newClientEmail.trim()) return;
 
-    // Auto-generate slug from name
-    const clientSlug = newClientName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
-
-    const newClientRecord: Client = {
-      id: `client-${Date.now()}`,
-      name: newClientName,
-      slug: clientSlug,
-      email: newClientEmail,
-      website: newClientWebsite || null,
-      isActive: true,
-      dataRetentionDays: newClientRetention,
-      timezone: newClientTimezone,
-      alertsEnabled: newClientAlerts,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    setRegisterLoading(true);
+    setRegisterError(null);
 
     try {
       const response = await clientApi.createClient({
         name: newClientName,
         email: newClientEmail,
-        website: newClientWebsite,
+        website: newClientWebsite || undefined,
       });
       if (response.success && response.data) {
-        newClientRecord.id = response.data.id;
-        newClientRecord.slug = response.data.slug;
+        setClients(prev => [response.data!, ...prev]);
+        handleCloseModal();
+      } else {
+        setRegisterError(response.message || 'Failed to onboard client.');
       }
-    } catch (err) {
-      console.warn('Backend client registration failed, saving mock client data');
+    } catch (err: any) {
+      console.error('Failed to create client:', err);
+      const errMsg = err.response?.data?.message || 'Failed to onboard client. Please try again.';
+      setRegisterError(errMsg);
+    } finally {
+      setRegisterLoading(false);
     }
-
-    setClients(prev => [newClientRecord, ...prev]);
-    setIsModalOpen(false);
-    // Clear forms
-    setNewClientName('');
-    setNewClientEmail('');
-    setNewClientWebsite('');
-    setNewClientRetention(30);
-    setNewClientTimezone('UTC');
-    setNewClientAlerts(true);
   };
 
   const handleCloseModal = () => {
@@ -213,9 +152,7 @@ export default function ClientsPage() {
     setNewClientName('');
     setNewClientEmail('');
     setNewClientWebsite('');
-    setNewClientRetention(30);
-    setNewClientTimezone('UTC');
-    setNewClientAlerts(true);
+    setRegisterError(null);
   };
 
   const handleRegisterUser = async (e: React.FormEvent) => {
@@ -437,6 +374,7 @@ export default function ClientsPage() {
                 <button
                   type="button"
                   onClick={handleCloseModal}
+                  disabled={registerLoading}
                   className="text-zinc-400 hover:text-zinc-600 transition"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -444,6 +382,14 @@ export default function ClientsPage() {
                   </svg>
                 </button>
               </div>
+
+              {/* Error Notification */}
+              {registerError && (
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-xs font-bold text-rose-600 flex items-center gap-2 animate-scale-in">
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                  {registerError}
+                </div>
+              )}
 
               {/* Client Name Input */}
               <div className="space-y-1.5">
@@ -454,10 +400,11 @@ export default function ClientsPage() {
                   type="text"
                   id="clientName"
                   required
+                  disabled={registerLoading}
                   placeholder="e.g. Google Maps Team"
                   value={newClientName}
                   onChange={(e) => setNewClientName(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition placeholder-zinc-400 animate-none"
+                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition placeholder-zinc-400 animate-none font-medium"
                 />
               </div>
 
@@ -470,10 +417,11 @@ export default function ClientsPage() {
                   type="email"
                   id="clientEmail"
                   required
+                  disabled={registerLoading}
                   placeholder="admin@gmaps.com"
                   value={newClientEmail}
                   onChange={(e) => setNewClientEmail(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition placeholder-zinc-400"
+                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition placeholder-zinc-400 font-medium"
                 />
               </div>
 
@@ -485,77 +433,39 @@ export default function ClientsPage() {
                 <input
                   type="text"
                   id="clientWebsite"
+                  disabled={registerLoading}
                   placeholder="e.g. https://maps.google.com"
                   value={newClientWebsite}
                   onChange={(e) => setNewClientWebsite(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition placeholder-zinc-400 animate-none"
+                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition placeholder-zinc-400 animate-none font-medium"
                 />
-              </div>
-
-              {/* Data Retention selection */}
-              <div className="space-y-1.5">
-                <label htmlFor="clientRetention" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider">
-                  Data Retention Threshold
-                </label>
-                <select
-                  id="clientRetention"
-                  value={newClientRetention}
-                  onChange={(e) => setNewClientRetention(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition font-medium"
-                >
-                  <option value={14}>14 Days</option>
-                  <option value={30}>30 Days (Standard)</option>
-                  <option value={90}>90 Days</option>
-                  <option value={180}>180 Days (Long-term)</option>
-                </select>
-              </div>
-
-              {/* Timezone selection */}
-              <div className="space-y-1.5">
-                <label htmlFor="clientTimezone" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider">
-                  Primary Timezone
-                </label>
-                <select
-                  id="clientTimezone"
-                  value={newClientTimezone}
-                  onChange={(e) => setNewClientTimezone(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition font-medium"
-                >
-                  <option value="UTC">UTC (Universal Coordinated)</option>
-                  <option value="GMT">GMT (Greenwich Mean Time)</option>
-                  <option value="EST">EST (Eastern Standard)</option>
-                  <option value="PST">PST (Pacific Standard)</option>
-                  <option value="IST">IST (Indian Standard)</option>
-                </select>
-              </div>
-
-              {/* Email Alerts Toggle Checkbox */}
-              <div className="flex items-center gap-2 py-1">
-                <input
-                  type="checkbox"
-                  id="clientAlerts"
-                  checked={newClientAlerts}
-                  onChange={(e) => setNewClientAlerts(e.target.checked)}
-                  className="h-4 w-4 rounded border-zinc-200 text-indigo-600 focus:ring-indigo-500/20"
-                />
-                <label htmlFor="clientAlerts" className="text-xs font-bold text-zinc-500 uppercase tracking-wider cursor-pointer">
-                  Enable System Alerts / Email warnings
-                </label>
               </div>
 
               <div className="flex gap-3 justify-end pt-3 border-t border-zinc-100">
                 <button
                   type="button"
                   onClick={handleCloseModal}
+                  disabled={registerLoading}
                   className="px-4 py-2 border border-zinc-200 text-zinc-500 hover:text-zinc-700 rounded-xl text-sm font-semibold transition hover:bg-zinc-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm transition active:scale-[0.98]"
+                  disabled={registerLoading}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl text-sm font-semibold shadow-sm transition active:scale-[0.98] flex items-center justify-center gap-2"
                 >
-                  Register Client
+                  {registerLoading ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Onboarding Client...</span>
+                    </>
+                  ) : (
+                    'Register Client'
+                  )}
                 </button>
               </div>
             </form>

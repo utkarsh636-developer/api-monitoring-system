@@ -27,6 +27,8 @@ export default function ApiKeysPage() {
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyEnv, setNewKeyEnv] = useState<'PRODUCTION' | 'STAGING' | 'DEVELOPMENT' | 'TESTING'>('DEVELOPMENT');
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createLoading, setCreateLoading] = useState(false);
 
   // Fetch client API keys
   useEffect(() => {
@@ -41,52 +43,9 @@ export default function ApiKeysPage() {
           }
         }
       } catch (err) {
-        console.warn('Backend API key fetch failed, loading developer mock keys');
-        
-        // Mock fallback keys in development (matches Twelvedata aesthetic)
+        console.error('Failed to fetch API keys from backend:', err);
         if (active) {
-          setKeys([
-            {
-              id: 'key-1',
-              name: 'Production Ingest Key',
-              key: 'api_prod_7f53a48e2b109c3d4e5f6a7b8c9d0e1f',
-              clientId: 'dev-client-id-999',
-              isActive: true,
-              environment: 'PRODUCTION' as any,
-              createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-              revealed: false,
-            },
-            {
-              id: 'key-2',
-              name: 'Staging Server Key',
-              key: 'api_stag_98c7b6a5d4e3f2a1b0c9d8e7f6a5b4c3',
-              clientId: 'dev-client-id-999',
-              isActive: true,
-              environment: 'STAGING' as any,
-              createdAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-              revealed: false,
-            },
-            {
-              id: 'key-3',
-              name: 'Local Dev Token',
-              key: 'api_dev_11223344556677889900aabbccddeeff',
-              clientId: 'dev-client-id-999',
-              isActive: false,
-              environment: 'DEVELOPMENT' as any,
-              createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-              revealed: false,
-            },
-            {
-              id: 'key-4',
-              name: 'CI/CD Testing Runner',
-              key: 'api_test_ffeeddccbbaa00998877665544332211',
-              clientId: 'dev-client-id-999',
-              isActive: true,
-              environment: 'TESTING' as any,
-              createdAt: new Date().toISOString(),
-              revealed: false,
-            },
-          ]);
+          setKeys([]);
         }
       } finally {
         if (active) {
@@ -171,45 +130,30 @@ export default function ApiKeysPage() {
   // Create new API key
   const handleCreateKey = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newKeyName.trim()) return;
+    if (!newKeyName.trim() || !user?.clientId) return;
 
-    // Generate random mock key matching our backend scheme
-    const randomHex = Array.from({ length: 32 }, () =>
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('');
-    const envPrefix = newKeyEnv.toLowerCase().substring(0, 4);
-    const keyVal = `api_${envPrefix}_${randomHex}`;
-
-    const newKeyRecord: ApiKeyUI = {
-      id: `key-${Date.now()}`,
-      name: newKeyName,
-      key: keyVal,
-      clientId: user?.clientId || 'dev-client-id-999',
-      isActive: true,
-      environment: newKeyEnv,
-      createdAt: new Date().toISOString(),
-      revealed: false,
-    };
+    setCreateLoading(true);
+    setCreateError(null);
 
     try {
-      if (user?.clientId) {
-        // Attempt actual creation if connected
-        const response = await clientApi.createApiKey(user.clientId, {
-          name: newKeyName,
-          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
-        });
-        if (response.success && response.data) {
-          // If backend runs, we overwrite with the real response
-          newKeyRecord.key = response.data.key;
-          newKeyRecord.id = response.data.id;
-        }
+      const response = await clientApi.createApiKey(user.clientId, {
+        name: newKeyName,
+        environment: newKeyEnv,
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
+      });
+      if (response.success && response.data) {
+        setKeys(prev => [{ ...response.data!, revealed: false }, ...prev]);
+        setGeneratedKey(response.data.key); // Transition to Secure Reveal Screen
+      } else {
+        setCreateError(response.message || 'Failed to generate API key.');
       }
-    } catch (err) {
-      console.warn('Backend key generation failed, saving generated mock key');
+    } catch (err: any) {
+      console.error('Failed to create API key:', err);
+      const errMsg = err.response?.data?.message || 'Failed to generate API key. Please try again.';
+      setCreateError(errMsg);
+    } finally {
+      setCreateLoading(false);
     }
-
-    setKeys(prev => [newKeyRecord, ...prev]);
-    setGeneratedKey(newKeyRecord.key); // Transition to Secure Reveal Screen
   };
 
   const handleCloseModal = () => {
@@ -217,6 +161,7 @@ export default function ApiKeysPage() {
     setNewKeyName('');
     setNewKeyEnv('DEVELOPMENT');
     setGeneratedKey(null);
+    setCreateError(null);
   };
 
   // Style helper for environments
@@ -472,6 +417,7 @@ export default function ApiKeysPage() {
                   <button
                     type="button"
                     onClick={handleCloseModal}
+                    disabled={createLoading}
                     className="text-zinc-400 hover:text-zinc-600 transition"
                   >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -479,6 +425,14 @@ export default function ApiKeysPage() {
                     </svg>
                   </button>
                 </div>
+
+                {/* Error Notification */}
+                {createError && (
+                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-xs font-bold text-rose-600 flex items-center gap-2 animate-scale-in">
+                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                    {createError}
+                  </div>
+                )}
 
                 {/* Key Name Input */}
                 <div className="space-y-1.5">
@@ -489,10 +443,11 @@ export default function ApiKeysPage() {
                     type="text"
                     id="keyName"
                     required
+                    disabled={createLoading}
                     placeholder="e.g. Production Ingestion pipeline"
                     value={newKeyName}
                     onChange={(e) => setNewKeyName(e.target.value)}
-                    className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition placeholder-zinc-400"
+                    className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition placeholder-zinc-400 font-medium"
                   />
                 </div>
 
@@ -504,6 +459,7 @@ export default function ApiKeysPage() {
                   <select
                     id="keyEnv"
                     value={newKeyEnv}
+                    disabled={createLoading}
                     onChange={(e) => setNewKeyEnv(e.target.value as any)}
                     className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm text-zinc-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition font-medium"
                   >
@@ -518,15 +474,27 @@ export default function ApiKeysPage() {
                   <button
                     type="button"
                     onClick={handleCloseModal}
+                    disabled={createLoading}
                     className="px-4 py-2 border border-zinc-200 text-zinc-500 hover:text-zinc-700 rounded-xl text-sm font-semibold transition hover:bg-zinc-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm transition active:scale-[0.98]"
+                    disabled={createLoading}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl text-sm font-semibold shadow-sm transition active:scale-[0.98] flex items-center justify-center gap-2"
                   >
-                    Generate Key
+                    {createLoading ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      'Generate Key'
+                    )}
                   </button>
                 </div>
               </form>
