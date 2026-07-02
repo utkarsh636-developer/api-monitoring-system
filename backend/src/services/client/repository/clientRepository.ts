@@ -94,6 +94,35 @@ export class ClientRepository extends BaseClientRepository {
             throw error;
         }
     }
+
+    async update(clientId: string, clientData: Prisma.ClientUpdateInput): Promise<Client> {
+        try {
+            const client = await this.model.update({
+                where: { id: clientId },
+                data: clientData
+            });
+
+            logger.info('Client updated in PostgreSQL', { id: client.id });
+            return client;
+        } catch (error: unknown) {
+            logger.error('Error updating client in db', error);
+            throw error;
+        }
+    }
+
+    async delete(clientId: string): Promise<Client> {
+        try {
+            const client = await this.model.delete({
+                where: { id: clientId }
+            });
+
+            logger.info('Client deleted from PostgreSQL', { id: client.id });
+            return client;
+        } catch (error: unknown) {
+            logger.error('Error deleting client from db', error);
+            throw error;
+        }
+    }
 }
 
 export default new ClientRepository();

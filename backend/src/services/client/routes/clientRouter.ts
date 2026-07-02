@@ -19,6 +19,14 @@ router.post("/admin/clients", (req: Request, res: Response, next: NextFunction) 
     clientController.createClient(req, res, next)
 );
 
+router.put("/admin/clients/:clientId", (req: Request, res: Response, next: NextFunction) =>
+    clientController.updateClient(req, res, next)
+);
+
+router.delete("/admin/clients/:clientId", (req: Request, res: Response, next: NextFunction) =>
+    clientController.deleteClient(req, res, next)
+);
+
 router.post("/admin/clients/onboard", (req: Request, res: Response, next: NextFunction) => 
     clientController.createClient(req, res, next)
 );

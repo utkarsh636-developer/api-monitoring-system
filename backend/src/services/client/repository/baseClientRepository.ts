@@ -18,4 +18,8 @@ export default abstract class BaseClientRepository {
     ): Promise<Client[]>;
 
     abstract count(filters: Prisma.ClientWhereInput): Promise<number>;
+
+    abstract update(clientId: string, clientData: Prisma.ClientUpdateInput): Promise<Client>;
+
+    abstract delete(clientId: string): Promise<Client>;
 }

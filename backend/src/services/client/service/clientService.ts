@@ -280,4 +280,31 @@ export class ClientService {
         }
     }
 
+    async updateClient(clientId: string, updateData: Partial<Client>): Promise<Client> {
+        try {
+            const client = await this.clientRepository.findById(clientId);
+            if (!client) {
+                throw new AppError("Client not found", 404);
+            }
+            return await this.clientRepository.update(clientId, updateData);
+        } catch (error: unknown) {
+            logger.error('Error in updateClient:', error);
+            throw error;
+        }
+    }
+
+    async deleteClient(clientId: string): Promise<Client> {
+        try {
+            const client = await this.clientRepository.findById(clientId);
+            if (!client) {
+                throw new AppError("Client not found", 404);
+            }
+            return await this.clientRepository.delete(clientId);
+        } catch (error: unknown) {
+            logger.error('Error in deleteClient:', error);
+            throw error;
+        }
+    }
+
 }
+

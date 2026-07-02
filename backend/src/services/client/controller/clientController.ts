@@ -82,5 +82,39 @@ export class ClientController {
             next(error);
         }
     }
+
+    async updateClient(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
+        try {
+            const userId = req.user!.userId;
+            const isSuperAdmin = await this.authService.checkSuperAdminPermissions(userId);
+            if (!isSuperAdmin) {
+                return res.status(403).json(ResponseFormatter.error("Access denied", 403));
+            }
+
+            const { clientId } = req.params;
+            const updatedClient = await this.clientService.updateClient(clientId, req.body);
+
+            return res.status(200).json(ResponseFormatter.success(updatedClient, "Client updated successfully", 200));
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteClient(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
+        try {
+            const userId = req.user!.userId;
+            const isSuperAdmin = await this.authService.checkSuperAdminPermissions(userId);
+            if (!isSuperAdmin) {
+                return res.status(403).json(ResponseFormatter.error("Access denied", 403));
+            }
+
+            const { clientId } = req.params;
+            const deletedClient = await this.clientService.deleteClient(clientId);
+
+            return res.status(200).json(ResponseFormatter.success(deletedClient, "Client deleted successfully", 200));
+        } catch (error) {
+            next(error);
+        }
+    }
   
 }
