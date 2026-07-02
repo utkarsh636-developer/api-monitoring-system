@@ -13,4 +13,10 @@ export default abstract class BaseApiKeyRepository {
     abstract findByClientId(clientId: string, filters?: Prisma.ApiKeyWhereInput): Promise<ApiKey[]>;
 
     abstract countByClientId(clientId: string, filters?: Prisma.ApiKeyWhereInput): Promise<number>;
+
+    abstract findById(id: string): Promise<ApiKey | null>;
+
+    abstract update(id: string, apiKeyData: Prisma.ApiKeyUpdateInput): Promise<ApiKey>;
+
+    abstract delete(id: string): Promise<ApiKey>;
 }

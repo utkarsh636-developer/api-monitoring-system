@@ -97,6 +97,45 @@ export class ApiKeyRepository extends BaseApiKeyRepository {
             throw error;
         }
     }
+
+    async findById(id: string): Promise<ApiKey | null> {
+        try {
+            const apiKey = await this.model.findUnique({
+                where: { id }
+            });
+            return apiKey;
+        } catch (error: unknown) {
+            logger.error('Error finding API key by id:', error);
+            throw error;
+        }
+    }
+
+    async update(id: string, apiKeyData: Prisma.ApiKeyUpdateInput): Promise<ApiKey> {
+        try {
+            const apiKey = await this.model.update({
+                where: { id },
+                data: apiKeyData
+            });
+            logger.info('API key updated in database', { keyId: apiKey.keyId });
+            return apiKey;
+        } catch (error: unknown) {
+            logger.error('Error updating API key in database:', error);
+            throw error;
+        }
+    }
+
+    async delete(id: string): Promise<ApiKey> {
+        try {
+            const apiKey = await this.model.delete({
+                where: { id }
+            });
+            logger.info('API key deleted from database', { keyId: apiKey.keyId });
+            return apiKey;
+        } catch (error: unknown) {
+            logger.error('Error deleting API key from database:', error);
+            throw error;
+        }
+    }
 }
 
 export default new ApiKeyRepository();

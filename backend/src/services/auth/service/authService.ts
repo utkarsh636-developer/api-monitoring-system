@@ -190,4 +190,32 @@ export class AuthService {
         }
     }
 
+    async updateProfile(userId: string, profileData: { username: string; email: string }): Promise<Omit<User, 'passwordHash'>> {
+        try {
+            const user = await this.userRepository.findById(userId);
+            if (!user) {
+                throw new AppError('User not found', 404);
+            }
+
+            if (profileData.username && profileData.username !== user.username) {
+                const existing = await this.userRepository.findByUsername(profileData.username);
+                if (existing) {
+                    throw new AppError('Username already taken', 400);
+                }
+            }
+            if (profileData.email && profileData.email !== user.email) {
+                const existing = await this.userRepository.findByEmail(profileData.email);
+                if (existing) {
+                    throw new AppError('Email address already in use', 400);
+                }
+            }
+
+            const updatedUser = await this.userRepository.update(userId, profileData);
+            return this.formatUserForResponse(updatedUser);
+        } catch (error: unknown) {
+            logger.error('Error updating user profile:', error);
+            throw error;
+        }
+    }
+
 }

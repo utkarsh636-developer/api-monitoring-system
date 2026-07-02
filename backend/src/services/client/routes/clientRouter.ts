@@ -43,4 +43,12 @@ router.get("/admin/clients/:clientId/api/keys", (req: Request, res: Response, ne
     clientController.getClientApiKeys(req, res, next)
 );
 
+router.put("/admin/clients/:clientId/api/keys/:keyId", (req: Request, res: Response, next: NextFunction) => 
+    clientController.updateApiKey(req, res, next)
+);
+
+router.delete("/admin/clients/:clientId/api/keys/:keyId", (req: Request, res: Response, next: NextFunction) => 
+    clientController.deleteApiKey(req, res, next)
+);
+
 export default router;

@@ -11,6 +11,7 @@ interface DashboardContextType {
   selectedClientId: string;
   setSelectedClientId: (clientId: string) => void;
   clients: Client[];
+  setUser: (user: User | null) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -133,7 +134,7 @@ export default function DashboardLayout({
   };
 
   return (
-    <DashboardContext.Provider value={{ user, selectedClientId, setSelectedClientId, clients }}>
+    <DashboardContext.Provider value={{ user, selectedClientId, setSelectedClientId, clients, setUser }}>
       <div className="flex h-screen overflow-hidden bg-zinc-50 font-sans">
         {/* Left Navigation Sidebar */}
         <Sidebar user={user} onLogout={handleLogout} />

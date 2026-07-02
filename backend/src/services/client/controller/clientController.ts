@@ -116,5 +116,25 @@ export class ClientController {
             next(error);
         }
     }
+
+    async updateApiKey(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
+        try {
+            const { clientId, keyId } = req.params;
+            const updatedKey = await this.clientService.updateApiKey(clientId, keyId, req.body, req.user!);
+            return res.status(200).json(ResponseFormatter.success(updatedKey, "API key updated successfully", 200));
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteApiKey(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
+        try {
+            const { clientId, keyId } = req.params;
+            const deletedKey = await this.clientService.deleteApiKey(clientId, keyId, req.user!);
+            return res.status(200).json(ResponseFormatter.success(deletedKey, "API key deleted successfully", 200));
+        } catch (error) {
+            next(error);
+        }
+    }
   
 }

@@ -119,4 +119,15 @@ export class AuthController {
         }
     }
 
+    async updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const userId = req.user!.userId;
+            const { username, email } = req.body;
+            const result = await this.authService.updateProfile(userId, { username, email });
+            res.status(200).json(ResponseFormatter.success(result, "Profile updated successfully", 200));
+        } catch (error) {
+            next(error);
+        }
+    }
+
 }

@@ -19,4 +19,6 @@ export default abstract class BaseRepository<T, TCreateInput = any> {
     abstract findByEmail(email: string): Promise<T | null>;
 
     abstract findAll(): Promise<T[]>;
+
+    abstract update(id: string, data: any): Promise<T>;
 }

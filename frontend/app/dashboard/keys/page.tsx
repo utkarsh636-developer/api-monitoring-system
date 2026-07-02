@@ -128,17 +128,42 @@ export default function ApiKeysPage() {
   };
 
   // Toggle active/inactive status
-  const handleToggleStatus = (id: string) => {
-    setKeys(prev =>
-      prev.map(k => (k.id === id ? { ...k, isActive: !k.isActive } : k))
-    );
+  const handleToggleStatus = async (id: string) => {
+    if (!user?.clientId) return;
+    const key = keys.find(k => k.id === id);
+    if (!key) return;
+
+    try {
+      const response = await clientApi.updateApiKey(user.clientId, id, { isActive: !key.isActive });
+      if (response.success && response.data) {
+        setKeys(prev =>
+          prev.map(k => (k.id === id ? { ...response.data!, revealed: key.revealed } : k))
+        );
+      } else {
+        alert(response.message || 'Failed to toggle API key status.');
+      }
+    } catch (err) {
+      console.error('Failed to toggle key status:', err);
+      alert('An error occurred while updating the API key status.');
+    }
     setActiveMenuId(null);
   };
 
   // Revoke/Delete API Key
   const handleRevokeKey = async (id: string) => {
+    if (!user?.clientId) return;
     if (confirm('Are you sure you want to revoke this API key? This action is permanent and will break any services currently using it.')) {
-      setKeys(prev => prev.filter(k => k.id !== id));
+      try {
+        const response = await clientApi.deleteApiKey(user.clientId, id);
+        if (response.success) {
+          setKeys(prev => prev.filter(k => k.id !== id));
+        } else {
+          alert(response.message || 'Failed to revoke API key.');
+        }
+      } catch (err) {
+        console.error('Failed to revoke key:', err);
+        alert('An error occurred while revoking the API key.');
+      }
       setActiveMenuId(null);
     }
   };

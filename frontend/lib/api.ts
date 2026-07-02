@@ -243,6 +243,14 @@ export const clientApi = {
         const response = await api.get<ApiResponse<ApiKey[]>>(`/admin/clients/${clientId}/api/keys`);
         return response.data;
     },
+    updateApiKey: async (clientId: string, keyId: string, keyData: Partial<ApiKey>): Promise<ApiResponse<ApiKey>> => {
+        const response = await api.put<ApiResponse<ApiKey>>(`/admin/clients/${clientId}/api/keys/${keyId}`, keyData);
+        return response.data;
+    },
+    deleteApiKey: async (clientId: string, keyId: string): Promise<ApiResponse<ApiKey>> => {
+        const response = await api.delete<ApiResponse<ApiKey>>(`/admin/clients/${clientId}/api/keys/${keyId}`);
+        return response.data;
+    },
     createClientUser: async (clientId: string, userData: any): Promise<ApiResponse<any>> => {
         const response = await api.post<ApiResponse<any>>(`/admin/clients/${clientId}/users`, userData);
         return response.data;

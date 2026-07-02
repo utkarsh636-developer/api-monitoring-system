@@ -306,5 +306,58 @@ export class ClientService {
         }
     }
 
+    async updateApiKey(
+        clientId: string,
+        apiKeyId: string,
+        updateData: Partial<ApiKey>,
+        user: { role: string; clientId?: string | null }
+    ): Promise<ApiKey> {
+        try {
+            if (!this.canUserAccessClient(user, clientId)) {
+                throw new AppError("Access denied to this client", 403);
+            }
+
+            if (!(user.role === Role.SUPER_ADMIN || user.role === Role.CLIENT_ADMIN)) {
+                throw new AppError("Access denied - Only Super Admin and Client Admin can update API keys", 403);
+            }
+
+            const apiKey = await this.apiKeyRepository.findById(apiKeyId);
+            if (!apiKey || apiKey.clientId !== clientId) {
+                throw new AppError("API key not found", 404);
+            }
+
+            return await this.apiKeyRepository.update(apiKeyId, updateData);
+        } catch (error) {
+            logger.error("Error updating API key", error);
+            throw error;
+        }
+    }
+
+    async deleteApiKey(
+        clientId: string,
+        apiKeyId: string,
+        user: { role: string; clientId?: string | null }
+    ): Promise<ApiKey> {
+        try {
+            if (!this.canUserAccessClient(user, clientId)) {
+                throw new AppError("Access denied to this client", 403);
+            }
+
+            if (!(user.role === Role.SUPER_ADMIN || user.role === Role.CLIENT_ADMIN)) {
+                throw new AppError("Access denied - Only Super Admin and Client Admin can delete API keys", 403);
+            }
+
+            const apiKey = await this.apiKeyRepository.findById(apiKeyId);
+            if (!apiKey || apiKey.clientId !== clientId) {
+                throw new AppError("API key not found", 404);
+            }
+
+            return await this.apiKeyRepository.delete(apiKeyId);
+        } catch (error) {
+            logger.error("Error deleting API key", error);
+            throw error;
+        }
+    }
+
 }
 

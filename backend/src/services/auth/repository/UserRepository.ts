@@ -86,6 +86,20 @@ export class UserRepository extends BaseRepository<User, Prisma.UserCreateInput>
             throw error;
         }
     }
+
+    async update(userId: string, userData: Prisma.UserUpdateInput): Promise<User> {
+        try {
+            const user = await this.model.update({
+                where: { id: userId },
+                data: userData
+            });
+            logger.info("User updated successfully", { username: user.username });
+            return user;
+        } catch (error: unknown) {
+            logger.error("Error updating user", error);
+            throw error;
+        }
+    }
 }
 
 // Export a singleton instance of the repository

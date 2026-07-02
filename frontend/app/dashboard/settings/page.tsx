@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useDashboard } from '../layout';
-import { clientApi } from '../../../lib/api';
+import { clientApi, authApi } from '../../../lib/api';
 
 export default function SettingsPage() {
-  const { user, selectedClientId, clients } = useDashboard();
+  const { user, selectedClientId, clients, setUser } = useDashboard();
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // User profile states
@@ -47,10 +47,24 @@ export default function SettingsPage() {
   }, [user, selectedClientId, clients]);
 
   // Handle personal settings submit
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSuccessMessage('Profile settings updated successfully!');
-    setTimeout(() => setSuccessMessage(null), 3000);
+    if (!username.trim() || !email.trim()) return;
+
+    try {
+      const response = await authApi.updateProfile({ username, email });
+      if (response.success && response.data) {
+        setUser(response.data);
+        setSuccessMessage('Profile settings updated successfully!');
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        alert(response.message || 'Failed to update profile.');
+      }
+    } catch (err: any) {
+      console.error('Failed to save profile:', err);
+      const errMsg = err.response?.data?.message || 'Failed to update profile settings.';
+      alert(errMsg);
+    }
   };
 
   // Handle organization settings submit
