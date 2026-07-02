@@ -88,6 +88,16 @@ export class ClientService {
         }
     }
 
+    async getClients(): Promise<Client[]> {
+        try {
+            const clients = await this.clientRepository.find({}, { orderBy: { name: 'asc' } });
+            return clients;
+        } catch (error: unknown) {
+            logger.error('Error fetching clients:', error);
+            throw error;
+        }
+    }
+
     canUserAccessClient(user: { role: string; clientId?: string | null }, clientId: string): boolean {
         if (user.role === APPLICATION_ROLES.SUPER_ADMIN) {
             return true;

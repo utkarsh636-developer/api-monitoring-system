@@ -36,6 +36,23 @@ export class ClientController {
         }
     }
 
+    async getClients(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
+        try {
+            const userId = req.user!.userId;
+            
+            const isSuperAdmin = await this.authService.checkSuperAdminPermissions(userId);
+            if (!isSuperAdmin) {
+                return res.status(403).json(ResponseFormatter.error("Access denied", 403));
+            }
+
+            const clients = await this.clientService.getClients();
+
+            return res.status(200).json(ResponseFormatter.success(clients, "Clients fetched successfully", 200));
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async createClientUser(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
         try {
             const { clientId } = req.params;

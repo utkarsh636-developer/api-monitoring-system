@@ -10,6 +10,15 @@ const { clientController } = clientDependencies.controller;
 router.use(authenticate);
 router.use(apiLimiter);
 
+// Client management routes
+router.get("/admin/clients", (req: Request, res: Response, next: NextFunction) =>
+    clientController.getClients(req, res, next)
+);
+
+router.post("/admin/clients", (req: Request, res: Response, next: NextFunction) =>
+    clientController.createClient(req, res, next)
+);
+
 router.post("/admin/clients/onboard", (req: Request, res: Response, next: NextFunction) => 
     clientController.createClient(req, res, next)
 );
