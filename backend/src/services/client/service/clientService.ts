@@ -7,6 +7,7 @@ import BaseRepository from '../../auth/repository/BaseRepository';
 import AppError from '../../../shared/utils/AppError';
 import logger from '../../../shared/config/logger';
 import { APPLICATION_ROLES, isValidClientRole } from '../../../shared/constants/roles';
+import CacheService from '../../../shared/service/cacheService';
 
 interface ClientServiceDependencies {
     clientRepository: BaseClientRepository;
@@ -326,7 +327,13 @@ export class ClientService {
                 throw new AppError("API key not found", 404);
             }
 
-            return await this.apiKeyRepository.update(apiKeyId, updateData);
+            const updatedKey = await this.apiKeyRepository.update(apiKeyId, updateData);
+            
+            // Invalidate Redis cache
+            const cacheKey = `api-key:${updatedKey.keyValue}`;
+            await CacheService.del(cacheKey);
+            
+            return updatedKey;
         } catch (error) {
             logger.error("Error updating API key", error);
             throw error;
@@ -352,7 +359,13 @@ export class ClientService {
                 throw new AppError("API key not found", 404);
             }
 
-            return await this.apiKeyRepository.delete(apiKeyId);
+            const deletedKey = await this.apiKeyRepository.delete(apiKeyId);
+            
+            // Invalidate Redis cache
+            const cacheKey = `api-key:${deletedKey.keyValue}`;
+            await CacheService.del(cacheKey);
+            
+            return deletedKey;
         } catch (error) {
             logger.error("Error deleting API key", error);
             throw error;
