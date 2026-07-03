@@ -153,6 +153,8 @@ export default function ApiKeysPage() {
     setNewKeyEnv('DEVELOPMENT');
     setGeneratedKey(null);
     setCreateError(null);
+    // Clear plaintext keys from the local state list so they are no longer visible/toggleable
+    setKeys(prev => prev.map(k => ({ ...k, key: '' })));
   };
 
   // Style helper for environments
