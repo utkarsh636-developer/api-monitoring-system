@@ -30,5 +30,5 @@ RUN mkdir -p logs
 # Expose port 5000
 EXPOSE 5000
 
-# Start the Express API server
-CMD ["node", "dist/src/server.js"]
+# Start the Express API server using npm start
+CMD ["npm", "start"]
