@@ -18,6 +18,9 @@ import analyticsRouter from './services/analytics/routes/analyticsRoutes'
 
 const app = express();
 
+// Trust proxy (required for rate limiting behind load balancers like Railway/Vercel)
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors({
     origin: true,
