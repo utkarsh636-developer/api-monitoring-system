@@ -6,6 +6,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "npx prisma db push && node dist/src/server.js",
+    "start:consumer": "node dist/src/services/processer/consumer.js",
     "db:migrate": "npx prisma migrate dev",
     "db:studio": "npx prisma studio"
   },
