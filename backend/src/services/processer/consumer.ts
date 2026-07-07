@@ -1,3 +1,5 @@
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
 import { z } from 'zod';
 import config from '../../shared/config/index';
 import logger from '../../shared/config/logger';
