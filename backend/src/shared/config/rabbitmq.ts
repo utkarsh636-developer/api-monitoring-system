@@ -77,7 +77,8 @@ class RabbitMQConnection {
             return this.channel;
         } catch (error: unknown) {
             this.isConnecting = false;
-            logger.error("Failed to connect to RabbitMQ", error);
+            const maskedUrl = config.rabbitmq.url.replace(/:[^@]+@/, ':****@');
+            logger.error(`Failed to connect to RabbitMQ (${maskedUrl}):`, error);
             throw error;
         }
     }
