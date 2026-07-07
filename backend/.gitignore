@@ -48,4 +48,3 @@ logs/
 /app/generated/prisma
 
 Development_node_env.txt
-scratch/
