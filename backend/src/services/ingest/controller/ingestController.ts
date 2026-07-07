@@ -37,6 +37,31 @@ export class IngestController {
                 method: hitData.method
             });
 
+            // // Temporary direct Postgres write for benchmarking:
+            // const prisma = require('../../../shared/config/prisma').default.getClient();
+            // const crypto = require('crypto');
+
+            // if (!prisma) throw new Error("DB Client not initialized");
+
+            // await prisma.apiHit.create({
+            //     data: {
+            //         eventId: hitData.eventId || crypto.randomUUID(),
+            //         timestamp: new Date(),
+            //         serviceName: hitData.serviceName,
+            //         endpoint: hitData.endpoint,
+            //         method: hitData.method.toUpperCase() as any,
+            //         statusCode: Number(hitData.statusCode),
+            //         latencyMs: Number(hitData.latencyMs),
+            //         clientId: hitData.clientId,
+            //         apiKeyId: hitData.apiKeyId,
+            //         ip: hitData.ip || 'unknown',
+            //         userAgent: hitData.userAgent || '',
+            //     }
+            // });
+
+            // return res.status(200).json(ResponseFormatter.success({ eventId: hitData.eventId }, 'API hit saved', 200));
+
+
             const result = await this.ingestService.ingestApiHit(hitData);
 
             if (result.status === 'rejected') {
@@ -52,6 +77,15 @@ export class IngestController {
             }
 
             return res.status(202).json(ResponseFormatter.success(result, 'API hit queued for processing', 202));
+
+            // This gives performance boost but isnt user friendly
+            // // Start publishing in the background (fire-and-forget)
+            // this.ingestService.ingestApiHit(hitData).catch(err => {
+            //     logger.error('Background ingestion publish failed:', err);
+            // });
+
+            // // Return 202 Accepted immediately
+            // return res.status(202).json(ResponseFormatter.success({ status: 'queued' }, 'API hit queued for processing', 202));
         } catch (error) {
             next(error);
         }

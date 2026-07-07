@@ -165,16 +165,15 @@ export class EventProducer {
                 this.logger.info('[EventProducer] back-pressure detected, waiting for drain', {
                     eventId: eventData.eventId,
                 });
+
+                const onDrain = () => {
+                    this.logger.debug('[EventProducer] drain event received', {
+                        eventId: eventData.eventId,
+                    });
+                };
+
+                channel.once("drain", onDrain);
             }
-
-            const onDrain = () => {
-                channel.removeListener('drain', onDrain);
-                this.logger.debug('[EventProducer] drain event received', {
-                    eventId: eventData.eventId,
-                });
-            };
-
-            channel.once("drain", onDrain);
         });
     }
 

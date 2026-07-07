@@ -34,6 +34,8 @@ const validateApiKey = async (req: Request, res: Response, next: NextFunction): 
         const cacheKey = `api-key:${apiKey}`;
 
         let result = await CacheService.get<CachedApiKeyData>(cacheKey);
+        // // AFTER (Force Cache Miss):
+        // let result = null;
 
         if (!result) {
             logger.debug('API Key Cache Miss, querying database');
