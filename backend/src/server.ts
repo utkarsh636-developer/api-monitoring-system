@@ -83,17 +83,30 @@ app.use((req: Request, res: Response) => {
 app.use(errorHandler);
 
 async function initializeConnection() {
-    try {
-        logger.info("Initializing database connections...");
+    const maxRetries = 5;
+    const retryDelayMs = 5000;
 
-        await prisma.connect();
-        await redis.connect()
-        await rabbitmq.connect();
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            logger.info(`Initializing database connections (Attempt ${attempt}/${maxRetries})...`);
 
-        logger.info("All connections established successfully");
-    } catch (error: unknown) {
-        logger.error("Failed to initialize connections:", error);
-        throw error;
+            await prisma.connect();
+            await redis.connect();
+            await rabbitmq.connect();
+
+            logger.info("All connections established successfully");
+            return;
+        } catch (error: any) {
+            logger.error(`Connection attempt ${attempt} failed:`, error.message || error);
+            
+            if (attempt === maxRetries) {
+                logger.error("Max connection retries reached. Exiting...");
+                throw error;
+            }
+
+            logger.info(`Waiting ${retryDelayMs / 1000}s before retrying...`);
+            await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        }
     }
 }
 
