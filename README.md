@@ -78,10 +78,10 @@ Create a `.env` file in the `backend/` directory based on `backend/.env.example`
 
 For local development (Docker), set:
 ```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/api_monitoring?schema=public"
-DIRECT_URL="postgresql://postgres:postgres@localhost:5432/api_monitoring?schema=public"
-REDIS_URL="redis://:utk_redis_password@localhost:6379"
-RABBITMQ_URL="amqp://api_user:utk_rabbitmq_password@localhost:5672/api_monitoring"
+DATABASE_URL="postgresql://postgres:your_db_password@localhost:5432/api_monitoring?schema=public"
+DIRECT_URL="postgresql://postgres:your_db_password@localhost:5432/api_monitoring?schema=public"
+REDIS_URL="redis://:your_redis_password@localhost:6379"
+RABBITMQ_URL="amqp://your_rabbitmq_user:your_rabbitmq_password@localhost:5672/your_vhost"
 ```
 
 ### 2. Start Infrastructure and Services (Docker)
@@ -101,7 +101,7 @@ npx prisma db push
 ### 4. Port access
 * **Next.js Dashboard:** [http://localhost:3000](http://localhost:3000)
 * **Backend API Server:** [http://localhost:5000](http://localhost:5000)
-* **RabbitMQ Management UI:** [http://localhost:15672](http://localhost:15672) (User: `api_user`, Pass: `utk_rabbitmq_password`)
+* **RabbitMQ Management UI:** [http://localhost:15672](http://localhost:15672) (User: `your_rabbitmq_user`, Pass: `your_rabbitmq_password`)
 * **pgAdmin Dashboard:** [http://localhost:8080](http://localhost:8080) (Email: `admin@example.com`, Pass: `admin`)
 
 ---
