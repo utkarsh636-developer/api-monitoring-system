@@ -1,4 +1,4 @@
-# API Hit Monitoring System
+# API Monitoring System
 
 A high-performance, fault-tolerant, event-driven API logging and analytics monitoring system designed to ingest, queue, and process millions of API hit records in real-time.
 
