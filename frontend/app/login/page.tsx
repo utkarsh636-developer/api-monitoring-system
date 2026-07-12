@@ -70,7 +70,7 @@ export default function LoginPage() {
             <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white text-xl font-bold shadow-md shadow-indigo-600/10">
               📡
             </div>
-            <span className="text-xl font-bold tracking-tight text-zinc-900">API Pulse</span>
+            <span className="text-xl font-bold tracking-tight text-zinc-900">API Beat</span>
           </div>
 
           {/* Titles */}
@@ -317,7 +317,7 @@ export default function LoginPage() {
               The easiest way to monitor your APIs.
             </h2>
             <p className="text-indigo-100 text-sm max-w-sm mx-auto leading-relaxed font-medium opacity-90">
-              Track latency spikes, analyze HTTP status flows, and secure your systems with API Pulse.
+              Track latency spikes, analyze HTTP status flows, and secure your systems with API Beat.
             </p>
           </div>
 

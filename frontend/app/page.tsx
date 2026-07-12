@@ -21,7 +21,7 @@ export default function Home() {
         {/* Title */}
         <div className="space-y-3">
           <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent leading-none">
-            API Pulse Monitor
+            API Beat
           </h1>
           <p className="max-w-md mx-auto text-sm sm:text-base text-zinc-400 font-medium leading-relaxed">
             A premium, real-time analytics dashboard for monitoring API performance, tracking response latencies, managing key permissions, and analyzing status health.

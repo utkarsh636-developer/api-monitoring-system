@@ -40,7 +40,8 @@ export default function Sidebar({ user, onLogout }: SidebarProps) {
       href: '/dashboard/keys',
       icon: (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m0 0a2 2 0 01-2 2m2-2h3m-3 0H9M3 12a9 9 0 0115 0M3 12a9 9 0 0015 0M3 12A9 9 0 1118 12M3 12a9 9 0 1015 0" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.432L12.75 19.5H8.25v-4.5l6.75-6.75c.406-.404.529-1 .432-1.563A6 6 0 0115.75 5.25Z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0Z" />
         </svg>
       ),
       roles: ['SUPER_ADMIN', 'CLIENT_ADMIN', 'CLIENT_VIEWER'], // Client Admin, Super Admin & Client Viewer
@@ -87,8 +88,7 @@ export default function Sidebar({ user, onLogout }: SidebarProps) {
           </svg>
         </div>
         <div>
-          <span className="font-bold text-zinc-900 text-lg tracking-tight">API Pulse</span>
-          <span className="text-[10px] block text-zinc-400 font-mono -mt-1">MONITOR v1.0</span>
+          <span className="font-bold text-zinc-900 text-lg tracking-tight">API Beat</span>
         </div>
       </div>
 

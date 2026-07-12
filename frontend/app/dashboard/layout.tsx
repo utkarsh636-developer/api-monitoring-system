@@ -121,7 +121,7 @@ export default function DashboardLayout({
             </span>
           </div>
           <p className="text-sm font-semibold text-zinc-500 animate-pulse">
-            Connecting to API Pulse...
+            Connecting to API Beat...
           </p>
         </div>
       </div>

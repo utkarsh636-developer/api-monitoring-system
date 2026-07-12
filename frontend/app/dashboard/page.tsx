@@ -443,7 +443,7 @@ export default function DashboardOverview() {
           value={dashboardData.stats.uniqueEndpoints.toString()}
           icon={
             <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m0 0a2 2 0 01-2 2m2-2h3m-3 0H9M3 12a9 9 0 0115 0M3 12a9 9 0 0015 0M3 12A9 9 0 1118 12M3 12a9 9 0 1015 0" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 103.935 1.274 2.25 2.25 0 00-3.935-1.274Zm0 0L10.5 12m7.717 3.5a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5Z" />
             </svg>
           }
           trend="Active"
