@@ -138,7 +138,7 @@ export class AnalyticsService {
 
     parseTimeFilters(filters: AnalyticsFilters = {}): { startTime: Date; endTime: Date } {
         let startTime: Date;
-        if (!filters.startTime) {
+        if (filters.startTime === undefined || filters.startTime === null || filters.startTime === '') {
             startTime = new Date();
             startTime.setHours(startTime.getHours() - 24); // Last 24 hrs
         } else {
@@ -148,7 +148,7 @@ export class AnalyticsService {
         startTime.setSeconds(Math.floor(startTime.getSeconds() / 10) * 10, 0);
 
         let endTime: Date;
-        if (!filters.endTime) {
+        if (filters.endTime === undefined || filters.endTime === null || filters.endTime === '') {
             endTime = new Date();
         } else {
             endTime = new Date(filters.endTime);
