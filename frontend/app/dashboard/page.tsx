@@ -94,9 +94,143 @@ export default function DashboardOverview() {
     }
   };
 
+  const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
+
   useEffect(() => {
     fetchDashboardData();
   }, [selectedClientId, timeRange]);
+
+  useEffect(() => {
+    let socket: WebSocket | null = null;
+    let reconnectTimer: any = null;
+
+    const connectWs = () => {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
+        const urlObj = new URL(apiBase);
+        const protocol = urlObj.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${urlObj.host}/dashboard-ws`;
+
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+          console.log('[Frontend Dashboard] Connected to WebSocket live stream');
+          setIsLiveConnected(true);
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const liveEvent = JSON.parse(event.data);
+            if (!liveEvent || !liveEvent.endpoint) return;
+
+            setDashboardData((prevData) => {
+              if (!prevData) return prevData;
+
+              const isError = Number(liveEvent.statusCode) >= 400;
+              const incomingLatency = Number(liveEvent.latencyMs || 0);
+
+              const oldTotalHits = prevData.stats.totalHits || 0;
+              const oldAvgLatency = prevData.stats.avgLatency || 0;
+              const newTotalHits = oldTotalHits + 1;
+              const newErrorHits = (prevData.stats.errorHits || 0) + (isError ? 1 : 0);
+              const newSuccessHits = newTotalHits - newErrorHits;
+              const newErrorRate = newTotalHits > 0 ? Number(((newErrorHits / newTotalHits) * 100).toFixed(2)) : 0;
+              
+              const rawAvgLat = oldTotalHits > 0 
+                ? ((oldAvgLatency * oldTotalHits) + incomingLatency) / newTotalHits
+                : incomingLatency;
+              const newAvgLatency = Number(rawAvgLat.toFixed(2));
+
+              // Update top endpoints list
+              let updatedTopEndpoints = [...(prevData.topEndpoints || [])];
+              const epIndex = updatedTopEndpoints.findIndex(
+                (ep) => ep.endpoint === liveEvent.endpoint && ep.method?.toUpperCase() === liveEvent.method?.toUpperCase()
+              );
+
+              if (epIndex !== -1) {
+                const ep = updatedTopEndpoints[epIndex];
+                const epOldHits = ep.totalHits || 0;
+                const epTotalHits = epOldHits + 1;
+                const epErrorHits = Math.round(((ep.errorRate || 0) / 100) * epOldHits) + (isError ? 1 : 0);
+                const epNewErrorRate = Number(((epErrorHits / epTotalHits) * 100).toFixed(2));
+                const epRawAvgLat = ((ep.avgLatency * epOldHits) + incomingLatency) / epTotalHits;
+
+                updatedTopEndpoints[epIndex] = {
+                  ...ep,
+                  totalHits: epTotalHits,
+                  errorRate: epNewErrorRate,
+                  avgLatency: Number(epRawAvgLat.toFixed(2)),
+                };
+              } else {
+                updatedTopEndpoints.push({
+                  endpoint: liveEvent.endpoint,
+                  method: liveEvent.method?.toUpperCase() || 'GET',
+                  totalHits: 1,
+                  avgLatency: Number(incomingLatency.toFixed(2)),
+                  errorRate: isError ? 100 : 0,
+                });
+              }
+
+              updatedTopEndpoints.sort((a, b) => b.totalHits - a.totalHits);
+
+              // Calculate unique endpoints count live
+              const uniqueSet = new Set(updatedTopEndpoints.map((e) => e.endpoint));
+              const newUniqueEndpoints = Math.max(prevData.stats.uniqueEndpoints || 0, uniqueSet.size);
+
+              const hourBucket = new Date(Math.floor(Date.now() / 3600000) * 3600000).toISOString();
+              const newActivity = {
+                id: liveEvent.eventId || String(Date.now()),
+                serviceName: liveEvent.serviceName || 'api-monitoring',
+                endpoint: liveEvent.endpoint,
+                method: liveEvent.method?.toUpperCase() || 'GET',
+                totalHits: 1,
+                errorHits: isError ? 1 : 0,
+                avgLatency: Number(incomingLatency.toFixed(2)),
+                minLatency: Number(incomingLatency.toFixed(2)),
+                maxLatency: Number(incomingLatency.toFixed(2)),
+                timeBucket: hourBucket,
+              };
+
+              return {
+                ...prevData,
+                stats: {
+                  ...prevData.stats,
+                  totalHits: newTotalHits,
+                  errorHits: newErrorHits,
+                  successHits: newSuccessHits,
+                  errorRate: newErrorRate,
+                  avgLatency: newAvgLatency,
+                  uniqueEndpoints: newUniqueEndpoints,
+                },
+                topEndpoints: updatedTopEndpoints,
+                recentActivity: [newActivity, ...(prevData.recentActivity || [])].slice(0, 100),
+              };
+            });
+          } catch (err) {
+            console.error('[Frontend Dashboard] Error parsing live event:', err);
+          }
+        };
+
+        socket.onclose = () => {
+          setIsLiveConnected(false);
+          reconnectTimer = setTimeout(connectWs, 3000);
+        };
+
+        socket.onerror = () => {
+          socket?.close();
+        };
+      } catch (err) {
+        reconnectTimer = setTimeout(connectWs, 5000);
+      }
+    };
+
+    connectWs();
+
+    return () => {
+      if (socket) socket.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+    };
+  }, []);
 
   // Color mappings matching Image 2's specific rows
   const endpointColors = [
@@ -360,9 +494,22 @@ export default function DashboardOverview() {
       {/* 1. Welcome Banner */}
       <div className="bg-gradient-to-r from-zinc-900 to-indigo-950 rounded-2xl p-6 text-white shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight">
-            Welcome back, {user?.username || 'Developer'}!
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold tracking-tight">
+              Welcome back, {user?.username || 'Developer'}!
+            </h2>
+            {isLiveConnected ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                Live Stream Active
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700">
+                <span className="h-2 w-2 rounded-full bg-zinc-500"></span>
+                Connecting...
+              </span>
+            )}
+          </div>
           <p className="text-zinc-400 text-xs mt-1">
             System status is healthy. Monitoring {selectedClientId === 'all' ? 'all' : 'selected'} API endpoints.
           </p>
@@ -414,7 +561,7 @@ export default function DashboardOverview() {
 
         <MetricCard
           title="Avg Latency"
-          value={`${dashboardData.stats.avgLatency} ms`}
+          value={`${Number(dashboardData.stats.avgLatency || 0).toFixed(2)} ms`}
           icon={
             <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -574,7 +721,7 @@ export default function DashboardOverview() {
                           {getStatusLabel(hit.errorHits || 0, hit.totalHits || 0)}
                         </span>
                       </td>
-                      <td className="py-3 text-zinc-600 font-mono text-xs">{hit.avgLatency}ms</td>
+                      <td className="py-3 text-zinc-600 font-mono text-xs">{Number(hit.avgLatency || 0).toFixed(2)}ms</td>
                       <td className="py-3 text-right text-zinc-400 text-xs font-medium">
                         {new Date(hit.timeBucket).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </td>
@@ -681,7 +828,7 @@ export default function DashboardOverview() {
                           ></div>
                         </div>
                         <span className="text-[10px] font-bold font-mono text-zinc-400 min-w-[34px] text-right">
-                          {endpoint.avgLatency}ms
+                          {Number(endpoint.avgLatency || 0).toFixed(2)}ms
                         </span>
                       </div>
                     </div>
