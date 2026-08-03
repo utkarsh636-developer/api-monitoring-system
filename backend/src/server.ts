@@ -17,6 +17,7 @@ import authRouter from './services/auth/routes/authRouter';
 import clientRouter from './services/client/routes/clientRouter'
 import ingestRouter from './services/ingest/routes/ingestRoutes'
 import analyticsRouter from './services/analytics/routes/analyticsRoutes'
+import { DashboardWsServer } from './shared/realtime/dashboardWsServer';
 
 const app = express();
 
@@ -120,6 +121,20 @@ async function startServer() {
             logger.info(`API available at: http://localhost:${config.port}`);
         });
 
+        const dashboardWsServer = new DashboardWsServer({ httpServer: server });
+        await dashboardWsServer.connect();
+
+        // Intercept raw HTTP upgrade requests to validate the JWT
+        // before handing the socket to the WebSocket server.
+        server.on('upgrade', (request, socket, head) => {
+            dashboardWsServer.verifyUpgrade(request, socket as any, head).catch((error: unknown) => {
+                logger.error('[server] Unhandled error during WebSocket upgrade', {
+                    error: error instanceof Error ? error.message : String(error),
+                });
+                (socket as any).destroy();
+            });
+        });
+
         const gracefulShutdown = async (signal: string) => {
             logger.info(`${signal} received, shutting down gracefully...`);
 
@@ -127,6 +142,7 @@ async function startServer() {
                 logger.info("HTTP server closed");
 
                 try {
+                    await dashboardWsServer.shutdown();
                     await prisma.close();
                     await rabbitmq.close();
                     await redis.close()

@@ -2,6 +2,7 @@ import logger from '../../../shared/config/logger';
 import AppError from '../../../shared/utils/AppError';
 import crypto from 'crypto';
 import { EventProducer } from '../../../shared/events/producer/eventProducer';
+import liveMetricsPublisher from '../../../shared/realtime/liveMetricsPublisher';
 
 export interface ApiHitInput {
     serviceName: string;
@@ -45,6 +46,15 @@ export class IngestService {
                 ip: hitData.ip || 'unknown',
                 userAgent: hitData.userAgent || '',
             };
+
+            // Instantly publish metric to Redis Pub/Sub for real-time live streaming dashboard
+            liveMetricsPublisher.publish({
+                endpoint: event.endpoint,
+                method: String(event.method),
+                statusCode: Number(event.statusCode),
+                latencyMs: Number(event.latencyMs),
+                timestamp: Date.now(),
+            });
 
             const published = await this.eventProducer.publishApiHit(event);
 
