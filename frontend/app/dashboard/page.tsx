@@ -95,6 +95,8 @@ export default function DashboardOverview() {
   };
 
   const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
+  // True when the snapshot fetch fails so we can show a stale-data warning banner
+  const [snapshotWarning, setSnapshotWarning] = useState<boolean>(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -103,8 +105,73 @@ export default function DashboardOverview() {
   useEffect(() => {
     let socket: WebSocket | null = null;
     let reconnectTimer: any = null;
+    // Tracks reconnect attempt count for exponential backoff calculation.
+    // Resets to 0 on each successful connection.
+    let reconnectAttempt = 0;
 
-    const connectWs = () => {
+    /**
+     * Calculates the delay before the next reconnect attempt using capped exponential backoff.
+     *
+     * WHY exponential backoff?
+     *   If the backend restarts and all N browser clients reconnect simultaneously at a fixed
+     *   3-second interval, they cause a thundering-herd spike on Node.js and PostgreSQL
+     *   (N simultaneous snapshot queries). Exponential backoff distributes reconnect attempts
+     *   over time, reducing peak load on recovery.
+     *
+     * Delay schedule: 1s → 2s → 4s → 8s → 16s → 30s (capped)
+     *   Cap at 30s: Users notice stale data within 30 seconds, so we retry frequently
+     *   enough to recover quickly while still protecting the server from thundering herds.
+     */
+    const getBackoffDelay = (attempt: number): number => {
+      return Math.min(1000 * Math.pow(2, attempt), 30000);
+    };
+
+    /**
+     * Snapshot + Delta Pattern:
+     *
+     * PROBLEM: Redis Pub/Sub is fire-and-forget (at-most-once delivery).
+     *   If this client was disconnected for 30 seconds — whether due to a network drop,
+     *   a server restart, or a buffer-overflow force-close (code 4000) — all metric events
+     *   published during that window are permanently lost from the live stream. The browser's
+     *   in-memory KPI counters (totalHits, avgLatency, etc.) will be N hits behind reality.
+     *
+     * SOLUTION: Before opening the WebSocket connection, fetch GET /api/analytics/snapshot
+     *   which returns the last 300 EndpointMetrics rows from PostgreSQL in chronological order.
+     *   This completely replaces the browser's in-memory recentActivity rolling buffer with
+     *   verified DB state, eliminating drift. The WS stream then only needs to handle new
+     *   delta events from this point forward.
+     *
+     * This runs on initial page load AND on every reconnect, so ground truth is always
+     * restored before live streaming resumes.
+     */
+    const fetchSnapshotAndConnect = async () => {
+      // Step 1: Fetch ground-truth snapshot from PostgreSQL
+      try {
+        const snapshotResponse = await analyticsApi.getSnapshot(selectedClientId || undefined);
+        if (snapshotResponse.success && Array.isArray(snapshotResponse.data)) {
+          // Replace in-memory recentActivity with the verified DB snapshot.
+          // The snapshot is already sorted oldest → newest by the backend.
+          setDashboardData((prevData) => {
+            if (!prevData) return prevData;
+            return {
+              ...prevData,
+              recentActivity: snapshotResponse.data!,
+            };
+          });
+          // Clear any stale warning from a previous failed snapshot attempt
+          setSnapshotWarning(false);
+          console.log(`[Frontend Dashboard] Snapshot loaded: ${snapshotResponse.data!.length} records`);
+        }
+      } catch (snapshotErr) {
+        // Snapshot failed (network error, 5xx, etc.).
+        // We do NOT block the WebSocket from opening — the user can still see
+        // live deltas, just without guaranteed ground-truth baseline accuracy.
+        // Show a subtle warning banner so they know the data may be slightly stale.
+        console.warn('[Frontend Dashboard] Snapshot fetch failed — opening WS with stale state:', snapshotErr);
+        setSnapshotWarning(true);
+      }
+
+      // Step 2: Open the WebSocket connection for live delta events
       try {
         const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
         const urlObj = new URL(apiBase);
@@ -116,6 +183,8 @@ export default function DashboardOverview() {
         socket.onopen = () => {
           console.log('[Frontend Dashboard] Connected to WebSocket live stream');
           setIsLiveConnected(true);
+          // Reset backoff counter on successful connection
+          reconnectAttempt = 0;
         };
 
         socket.onmessage = (event) => {
@@ -135,8 +204,8 @@ export default function DashboardOverview() {
               const newErrorHits = (prevData.stats.errorHits || 0) + (isError ? 1 : 0);
               const newSuccessHits = newTotalHits - newErrorHits;
               const newErrorRate = newTotalHits > 0 ? Number(((newErrorHits / newTotalHits) * 100).toFixed(2)) : 0;
-              
-              const rawAvgLat = oldTotalHits > 0 
+
+              const rawAvgLat = oldTotalHits > 0
                 ? ((oldAvgLatency * oldTotalHits) + incomingLatency) / newTotalHits
                 : incomingLatency;
               const newAvgLatency = Number(rawAvgLat.toFixed(2));
@@ -203,7 +272,11 @@ export default function DashboardOverview() {
                   uniqueEndpoints: newUniqueEndpoints,
                 },
                 topEndpoints: updatedTopEndpoints,
-                recentActivity: [newActivity, ...(prevData.recentActivity || [])].slice(0, 100),
+                // Cap the rolling buffer at 300 to match the snapshot window size.
+                // When a buffer-overflow force-close (code 4000) triggers a reconnect,
+                // the snapshot replaces this array entirely, so old stale entries are
+                // never carried forward beyond the next resync.
+                recentActivity: [newActivity, ...(prevData.recentActivity || [])].slice(0, 300),
               };
             });
           } catch (err) {
@@ -211,26 +284,46 @@ export default function DashboardOverview() {
           }
         };
 
-        socket.onclose = () => {
+        socket.onclose = (event) => {
           setIsLiveConnected(false);
-          reconnectTimer = setTimeout(connectWs, 3000);
+
+          // Close code 4000 = buffer overflow force-close from the server.
+          // This is an explicit signal that this client's network was too slow to keep up
+          // with the live stream. The upcoming reconnect will fetch a fresh snapshot before
+          // resuming, automatically correcting any drift accumulated during the lag period.
+          if (event.code === 4000) {
+            console.warn('[Frontend Dashboard] WS closed by server (buffer overflow) — reconnecting with fresh snapshot');
+          }
+
+          // Increment attempt counter before scheduling next reconnect.
+          // fetchSnapshotAndConnect() resets this to 0 on successful open.
+          reconnectAttempt++;
+          const delay = getBackoffDelay(reconnectAttempt);
+          console.log(`[Frontend Dashboard] Reconnecting in ${delay}ms (attempt ${reconnectAttempt})`);
+          reconnectTimer = setTimeout(fetchSnapshotAndConnect, delay);
         };
 
         socket.onerror = () => {
+          // onerror always fires before onclose, so we just close the socket here.
+          // The onclose handler will schedule the reconnect with backoff.
           socket?.close();
         };
       } catch (err) {
-        reconnectTimer = setTimeout(connectWs, 5000);
+        // Failed to construct the WebSocket URL or create the socket.
+        reconnectAttempt++;
+        const delay = getBackoffDelay(reconnectAttempt);
+        console.error('[Frontend Dashboard] WS connection error — retrying in', delay, 'ms');
+        reconnectTimer = setTimeout(fetchSnapshotAndConnect, delay);
       }
     };
 
-    connectWs();
+    fetchSnapshotAndConnect();
 
     return () => {
       if (socket) socket.close();
       if (reconnectTimer) clearTimeout(reconnectTimer);
     };
-  }, []);
+  }, [selectedClientId]);
 
   // Color mappings matching Image 2's specific rows
   const endpointColors = [
@@ -513,6 +606,13 @@ export default function DashboardOverview() {
           <p className="text-zinc-400 text-xs mt-1">
             System status is healthy. Monitoring {selectedClientId === 'all' ? 'all' : 'selected'} API endpoints.
           </p>
+          {/* Snapshot warning banner — shown when the ground-truth snapshot fetch fails on connect/reconnect */}
+          {snapshotWarning && (
+            <p className="text-amber-400 text-xs mt-1 flex items-center gap-1.5">
+              <span>⚠</span>
+              Live data may be out of sync — snapshot unavailable. Accuracy will restore on next reconnect.
+            </p>
+          )}
         </div>
         
         {/* Time Range Selector */}
