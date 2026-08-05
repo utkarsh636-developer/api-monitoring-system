@@ -330,4 +330,62 @@ export class AnalyticsService {
             throw error;
         }
     }
+
+    /**
+     * Returns the most recent 300 EndpointMetrics records from PostgreSQL in
+     * chronological order (oldest → newest).
+     *
+     * This is the ground-truth snapshot used by the WebSocket Snapshot + Delta pattern:
+     * the frontend fetches this on initial load and on every WebSocket reconnect to
+     * replace its in-memory rolling buffer with verified DB state, eliminating any
+     * drift accumulated during network outages or buffer-overflow force-closes.
+     *
+     * WHY NOT cache this?
+     *   The snapshot is only fetched on reconnect events (rare) and must always reflect
+     *   the absolute latest DB state. A 30-second cache TTL would mean a reconnecting
+     *   client could receive data that is already 30 seconds stale — defeating the
+     *   purpose of the resync. We intentionally skip caching here.
+     */
+    async getSnapshot(clientId: string | null | undefined): Promise<TimeSeriesResult[]> {
+        try {
+            const SNAPSHOT_SIZE = 300;
+
+            // getMetrics() returns DESC (newest first). We fetch 300 records then
+            // reverse to get oldest → newest for the client's rolling buffer append order.
+            const metrics = await this.metricsRepository.getMetrics({
+                clientId,
+                limit: SNAPSHOT_SIZE,
+            });
+
+            const result: TimeSeriesResult[] = metrics.map((metric: any) => {
+                const serviceName = metric.serviceName ?? metric.service_name;
+                const totalHits = parseInt(metric.totalHits ?? metric.total_hits) || 0;
+                const errorHits = parseInt(metric.errorHits ?? metric.error_hits) || 0;
+                const avgLatency = parseFloat(metric.avgLatency ?? metric.avg_latency) || 0;
+                const minLatency = parseFloat(metric.minLatency ?? metric.min_latency) || 0;
+                const maxLatency = parseFloat(metric.maxLatency ?? metric.max_latency) || 0;
+                const timeBucket = metric.timeBucket ?? metric.time_bucket;
+                return {
+                    serviceName,
+                    endpoint: metric.endpoint,
+                    method: metric.method,
+                    totalHits,
+                    errorHits,
+                    avgLatency: parseFloat(avgLatency.toFixed(2)),
+                    minLatency: parseFloat(minLatency.toFixed(2)),
+                    maxLatency: parseFloat(maxLatency.toFixed(2)),
+                    timeBucket,
+                };
+            });
+
+            // Reverse DESC → ASC: oldest record first so the client can push
+            // new live events to the end of the array naturally.
+            result.reverse();
+
+            return result;
+        } catch (error) {
+            logger.error('Error getting snapshot:', error);
+            throw error;
+        }
+    }
 }

@@ -101,4 +101,41 @@ export class AnalyticsController {
             next(error);
         }
     }
+
+    /**
+     * GET /api/analytics/snapshot
+     *
+     * Returns the most recent 300 EndpointMetrics records from PostgreSQL in chronological
+     * order (oldest → newest). This is the ground-truth payload for the WebSocket
+     * Snapshot + Delta resync pattern.
+     *
+     * The frontend fetches this endpoint:
+     *   1. On initial dashboard page load (before opening the WebSocket).
+     *   2. On every WebSocket reconnect (to recover from missed events during network lag
+     *      or buffer-overflow force-closes with code 4000).
+     *
+     * Protected by the same authenticate + analyticsLimiter middleware as all analytics routes.
+     */
+    async getSnapshot(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const { clientId } = req.query;
+            const userId = req.user?.userId;
+            const userClientId = req.user?.clientId;
+
+            const isSuperAdmin = await this.analyticsService.ensureCanViewAnalytics(userId);
+            const finalClientId = await this.analyticsService.resolveFinalClientId({
+                queryClientId: clientId as string | undefined,
+                userClientId,
+                isSuperAdmin,
+            });
+
+            const snapshot = await this.analyticsService.getSnapshot(finalClientId);
+
+            res.status(200).json(
+                ResponseFormatter.success(snapshot, 'Snapshot retrieved successfully', 200)
+            );
+        } catch (error) {
+            next(error);
+        }
+    }
 }
