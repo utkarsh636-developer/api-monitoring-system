@@ -203,6 +203,12 @@ export const analyticsApi = {
 
         return payload;
     },
+    getSnapshot: async (clientId?: string): Promise<ApiResponse<RecentActivity[]>> => {
+        const params: Record<string, any> = {};
+        if (clientId && clientId !== 'all') params.clientId = clientId;
+        const response = await api.get<ApiResponse<RecentActivity[]>>('/analytics/snapshot', { params });
+        return response.data || {};
+    },
     getStats: async (params?: Record<string, any>): Promise<ApiResponse<any>> => {
         const response = await api.get<ApiResponse<any>>('/analytics/stats', { params });
         return response.data;
