@@ -8,8 +8,6 @@ import logger from '../config/logger';
 import CacheService from '../service/cacheService';
 import { LIVE_METRICS_CHANNEL, LiveMetricEvent } from './liveMetricsPublisher';
 
-// How many bytes can be buffered on a client socket before
-// we consider it "too slow" and drop the message instead of queuing.
 const BACKPRESSURE_THRESHOLD_BYTES = 1024 * 16; // 16 KB
 
 interface DecodedToken {
