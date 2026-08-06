@@ -244,4 +244,17 @@ model EndpointMetrics {
   @@index([clientId, serviceName, endpoint])
 }
 
+// 7. Latency anomaly alerts (written by the EWMA anomaly detector process)
+model LatencyAlert {
+  id            Int      @id @default(autoincrement())
+  endpoint      String
+  method        String
+  actualValue   Float    // Observed latencyMs that triggered the alert
+  expectedValue Float    // EWMA mean at the moment of detection
+  stdDevs       Float    // How many σ above the mean the observation was
+  detectedAt    DateTime // Timestamp taken from the originating MetricEvent
+  createdAt     DateTime @default(now())
 
+  @@index([endpoint, method])
+  @@index([detectedAt])
+}
