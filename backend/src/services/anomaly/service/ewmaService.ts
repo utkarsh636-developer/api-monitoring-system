@@ -88,24 +88,40 @@ export class EwmaService {
     evaluate(x: number, state: EndpointState): EwmaResult {
         const { mean, variance, count } = state;
 
-        // Capture the mean BEFORE folding this sample in — this is the "expected" value
-        // the caller should report in the alert (what we predicted, not what we now think).
+        // Capture expected value BEFORE updating
         const expectedValue = mean;
 
+        // ── STEP 1: Evaluate stdDevs against the PRIOR baseline ───────────────
+        //
+        // ROOT CAUSE OF THE ORIGINAL BUG:
+        //   The original code computed newVariance (which includes the spike),
+        //   then used sqrt(newVariance) to evaluate whether the spike was anomalous.
+        //   A 500ms spike after 20× 45ms hits inflates newVariance to 33,124,
+        //   giving stdDev=182 and stdDevs=455/182=2.5σ — BELOW the 3σ threshold.
+        //   The spike literally masked itself.
+        //
+        // THE FIX:
+        //   Evaluate stdDevs using the PRIOR variance (before the spike is folded in).
+        //   This gives the true σ-distance from the established baseline.
+        //
+        // MIN FLOOR of 1.0ms:
+        //   After 20 identical samples, variance=0 (priorStdDev=0).
+        //   Without the floor, stdDevs = 455/0 = Infinity or NaN, causing undefined behaviour.
+        //   With the floor, stdDevs = 455/1.0 = 455σ — correctly triggers the alert.
+        const priorStdDev = Math.sqrt(Math.max(0, variance));
+        const effectiveStdDev = Math.max(priorStdDev, 1.0);
+        const stdDevs = Math.abs(x - expectedValue) / effectiveStdDev;
+
+        const newCount = count + 1;
+        const isAnomaly = newCount >= this.warmupSamples && stdDevs > this.threshold;
+
+        // ── STEP 2: Update EWMA state for future samples ──────────────────────
+        // This is intentionally done AFTER the anomaly check so the spike does
+        // not widen the baseline and hide itself from detection.
         const diff = x - mean;
         const increment = this.alpha * diff;
         const newMean = mean + increment;
         const newVariance = (1 - this.alpha) * (variance + diff * increment);
-        const newCount = count + 1;
-
-        const stdDev = Math.sqrt(Math.max(0, newVariance)); // guard against floating-point negatives
-
-        // stdDevs: how far the observation is from the (pre-update) mean, in σ units.
-        // We intentionally use the PRE-update mean (expectedValue) for the alert message
-        // so the numbers match the user's intuition ("expected X ms, got Y ms").
-        const stdDevs = stdDev > 0 ? Math.abs(x - expectedValue) / stdDev : 0;
-
-        const isAnomaly = newCount >= this.warmupSamples && stdDevs > this.threshold;
 
         return {
             updatedState: { mean: newMean, variance: newVariance, count: newCount },

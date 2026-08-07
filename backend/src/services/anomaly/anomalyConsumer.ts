@@ -138,6 +138,7 @@ export class AnomalyConsumer {
 
     async start(): Promise<void> {
         this.logger.info('[AnomalyConsumer] Starting anomaly consumer...');
+        await dbConnection.connect();
         await this.subscriber.connect();
     }
 
