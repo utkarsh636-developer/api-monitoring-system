@@ -7,6 +7,7 @@ import config from '../config/index';
 import logger from '../config/logger';
 import CacheService from '../service/cacheService';
 import { LIVE_METRICS_CHANNEL, LiveMetricEvent } from './liveMetricsPublisher';
+import { LIVE_ALERTS_CHANNEL, AlertEvent } from './liveAlertsPublisher';
 
 const BACKPRESSURE_THRESHOLD_BYTES = 1024 * 16; // 16 KB
 
@@ -24,9 +25,11 @@ export interface DashboardWsServerDependencies {
 
 export class DashboardWsServer {
     private wss: WebSocketServer;
-    private subscriber: Redis;
+    private subscriber: Redis;       // Dedicated subscriber for metrics:live
+    private alertSubscriber: Redis;   // Dedicated subscriber for alerts:live
     private clients: Set<WebSocket>;
     private isSubscribed: boolean;
+    private isAlertSubscribed: boolean;
 
     constructor({ httpServer }: DashboardWsServerDependencies) {
         if (!httpServer) {
@@ -35,12 +38,13 @@ export class DashboardWsServer {
 
         this.clients = new Set();
         this.isSubscribed = false;
+        this.isAlertSubscribed = false;
 
         // Attach to the HTTP server via manual upgrade handling (noServer: true)
         // to prevent double HTTP upgrade handshakes.
         this.wss = new WebSocketServer({ noServer: true }); // noServer: true as this allows us to intercept incoming upgrade requests, authenticate the user's JWT, and only accept WebSocket requests sent to the path /dashboard-ws.
 
-        // A dedicated Redis connection purely for SUBSCRIBE.
+        // Dedicated Redis connection for the metrics:live subscriber.
         // Redis Pub/Sub puts a connection into "subscriber mode" which
         // disallows all other commands (GET, SET, etc.) on that same connection.
         this.subscriber = new Redis(config.redis.url, {
@@ -48,52 +52,121 @@ export class DashboardWsServer {
             lazyConnect: true,
         });
 
-        this._attachSubscriberEvents();
+        // A second dedicated connection for the alerts:live subscriber.
+        // Must be separate from the metrics subscriber because ioredis only allows
+        // one subscriber mode per connection, and separate connections give us
+        // independent reconnect handling for each channel.
+        this.alertSubscriber = new Redis(config.redis.url, {
+            maxRetriesPerRequest: null,
+            lazyConnect: true,
+        });
+
+        this._attachMetricsSubscriberEvents();
+        this._attachAlertsSubscriberEvents();
         this._attachWssEvents();
     }
 
-    private _attachSubscriberEvents(): void {
+    private _attachMetricsSubscriberEvents(): void {
         this.subscriber.on('connect', () => {
-            logger.info('[DashboardWS] Redis subscriber connected');
+            logger.info('[DashboardWS] Redis metrics subscriber connected');
         });
 
         this.subscriber.on('ready', () => {
-            this._subscribe();
+            this._subscribeToMetrics();
         });
 
         this.subscriber.on('error', (error: Error) => {
-            logger.error('[DashboardWS] Redis subscriber error', {
+            logger.error('[DashboardWS] Redis metrics subscriber error', {
                 error: error.message,
             });
         });
 
         this.subscriber.on('close', () => {
-            logger.warn('[DashboardWS] Redis subscriber connection closed');
+            logger.warn('[DashboardWS] Redis metrics subscriber connection closed');
             this.isSubscribed = false;
         });
 
         // ioredis reconnects automatically; when it recovers re-subscribe.
         this.subscriber.on('reconnecting', () => {
-            logger.info('[DashboardWS] Redis subscriber reconnecting...');
+            logger.info('[DashboardWS] Redis metrics subscriber reconnecting...');
         });
 
-        // Fired when a message arrives on any subscribed channel.
+        // Wrap the raw metric payload in a typed envelope so the client can
+        // distinguish metric events from alert events without ambiguity.
         this.subscriber.on('message', (channel: string, message: string) => {
             if (channel !== LIVE_METRICS_CHANNEL) return;
-            this._broadcastToClients(message);
+            try {
+                const envelope = JSON.stringify({ type: 'metric', data: JSON.parse(message) });
+                this._broadcastToClients(envelope);
+            } catch {
+                // Malformed JSON from Redis — log and skip; never crash the WS server
+                logger.warn('[DashboardWS] Failed to parse metrics:live message', { raw: message.slice(0, 200) });
+            }
         });
     }
 
-    private _subscribe(): void {
+    private _attachAlertsSubscriberEvents(): void {
+        this.alertSubscriber.on('connect', () => {
+            logger.info('[DashboardWS] Redis alerts subscriber connected');
+        });
+
+        this.alertSubscriber.on('ready', () => {
+            this._subscribeToAlerts();
+        });
+
+        this.alertSubscriber.on('error', (error: Error) => {
+            logger.error('[DashboardWS] Redis alerts subscriber error', {
+                error: error.message,
+            });
+        });
+
+        this.alertSubscriber.on('close', () => {
+            logger.warn('[DashboardWS] Redis alerts subscriber connection closed');
+            this.isAlertSubscribed = false;
+        });
+
+        this.alertSubscriber.on('reconnecting', () => {
+            logger.info('[DashboardWS] Redis alerts subscriber reconnecting...');
+        });
+
+        // Forward alert events to all connected clients as { type: 'alert', data: AlertEvent }.
+        // This is the ONLY addition to the WS server for anomaly detection —
+        // the anomaly consumer and WS server remain fully decoupled via Redis Pub/Sub.
+        this.alertSubscriber.on('message', (channel: string, message: string) => {
+            if (channel !== LIVE_ALERTS_CHANNEL) return;
+            try {
+                const envelope = JSON.stringify({ type: 'alert', data: JSON.parse(message) });
+                this._broadcastToClients(envelope);
+            } catch {
+                logger.warn('[DashboardWS] Failed to parse alerts:live message', { raw: message.slice(0, 200) });
+            }
+        });
+    }
+
+    private _subscribeToMetrics(): void {
         if (this.isSubscribed) return;
 
         this.subscriber.subscribe(LIVE_METRICS_CHANNEL).then(() => {
             this.isSubscribed = true;
             logger.info(`[DashboardWS] Subscribed to channel: ${LIVE_METRICS_CHANNEL}`);
         }).catch((error: unknown) => {
-            logger.error('[DashboardWS] Failed to subscribe to Redis channel', {
+            logger.error('[DashboardWS] Failed to subscribe to metrics channel', {
                 error: error instanceof Error ? error.message : String(error),
                 channel: LIVE_METRICS_CHANNEL,
+            });
+        });
+    }
+
+    private _subscribeToAlerts(): void {
+        if (this.isAlertSubscribed) return;
+
+        this.alertSubscriber.subscribe(LIVE_ALERTS_CHANNEL).then(() => {
+            this.isAlertSubscribed = true;
+            logger.info(`[DashboardWS] Subscribed to channel: ${LIVE_ALERTS_CHANNEL}`);
+        }).catch((error: unknown) => {
+            logger.error('[DashboardWS] Failed to subscribe to alerts channel', {
+                error: error instanceof Error ? error.message : String(error),
+                channel: LIVE_ALERTS_CHANNEL,
             });
         });
     }
@@ -255,10 +328,13 @@ export class DashboardWsServer {
 
     async connect(): Promise<void> {
         try {
-            await this.subscriber.connect();
+            await Promise.all([
+                this.subscriber.connect(),
+                this.alertSubscriber.connect(),
+            ]);
             logger.info('[DashboardWS] WebSocket server listening on /dashboard-ws');
         } catch (error: unknown) {
-            logger.error('[DashboardWS] Failed to connect Redis subscriber', {
+            logger.error('[DashboardWS] Failed to connect Redis subscribers', {
                 error: error instanceof Error ? error.message : String(error),
             });
             throw error;
@@ -274,7 +350,18 @@ export class DashboardWsServer {
             }
             await this.subscriber.quit();
         } catch (error: unknown) {
-            logger.error('[DashboardWS] Error closing Redis subscriber', {
+            logger.error('[DashboardWS] Error closing Redis metrics subscriber', {
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
+
+        try {
+            if (this.isAlertSubscribed) {
+                await this.alertSubscriber.unsubscribe(LIVE_ALERTS_CHANNEL);
+            }
+            await this.alertSubscriber.quit();
+        } catch (error: unknown) {
+            logger.error('[DashboardWS] Error closing Redis alerts subscriber', {
                 error: error instanceof Error ? error.message : String(error),
             });
         }
