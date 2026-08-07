@@ -189,7 +189,21 @@ export default function DashboardOverview() {
 
         socket.onmessage = (event) => {
           try {
-            const liveEvent = JSON.parse(event.data);
+            // The server now sends typed envelopes: { type: 'metric' | 'alert', data: ... }
+            const envelope = JSON.parse(event.data);
+            if (!envelope || !envelope.type || !envelope.data) return;
+
+            if (envelope.type === 'alert') {
+              // Anomaly alert received from the EWMA detector via the WS server.
+              // Log it for now — UI integration (toast / alert panel) can be layered on top.
+              console.warn('[Frontend Dashboard] Anomaly alert received:', envelope.data);
+              return;
+            }
+
+            if (envelope.type !== 'metric') return;
+
+            // ── Metric event: same handling as before ─────────────────────────
+            const liveEvent = envelope.data;
             if (!liveEvent || !liveEvent.endpoint) return;
 
             setDashboardData((prevData) => {

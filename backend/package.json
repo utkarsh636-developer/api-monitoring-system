@@ -7,6 +7,8 @@
     "build": "tsc",
     "start": "npx prisma db push && node dist/src/server.js",
     "start:consumer": "node dist/src/services/processer/consumer.js",
+    "start:anomaly": "node dist/src/services/anomaly/anomalyConsumer.js",
+    "dev:anomaly": "tsx watch src/services/anomaly/anomalyConsumer.ts",
     "db:migrate": "npx prisma migrate dev",
     "db:studio": "npx prisma studio"
   },
