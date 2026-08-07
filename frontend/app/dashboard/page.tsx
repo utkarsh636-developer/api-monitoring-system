@@ -98,6 +98,17 @@ export default function DashboardOverview() {
   // True when the snapshot fetch fails so we can show a stale-data warning banner
   const [snapshotWarning, setSnapshotWarning] = useState<boolean>(false);
 
+  // Real-time EWMA latency anomaly alerts stack
+  const [activeAlerts, setActiveAlerts] = useState<Array<{
+    id: string;
+    endpoint: string;
+    method: string;
+    actualValue: number;
+    expectedValue: number;
+    stdDevs: number;
+    timestamp: number;
+  }>>([]);
+
   useEffect(() => {
     fetchDashboardData();
   }, [selectedClientId, timeRange]);
@@ -194,9 +205,23 @@ export default function DashboardOverview() {
             if (!envelope || !envelope.type || !envelope.data) return;
 
             if (envelope.type === 'alert') {
-              // Anomaly alert received from the EWMA detector via the WS server.
-              // Log it for now — UI integration (toast / alert panel) can be layered on top.
-              console.warn('[Frontend Dashboard] Anomaly alert received:', envelope.data);
+              const alertData = envelope.data;
+              console.warn('[Frontend Dashboard] Anomaly alert received:', alertData);
+              
+              const alertId = String(Date.now()) + Math.random().toString(36).substring(2, 7);
+              const newAlert = {
+                id: alertId,
+                endpoint: alertData.endpoint || '/unknown',
+                method: alertData.method || 'GET',
+                actualValue: Number(alertData.actualValue || 0),
+                expectedValue: Number(alertData.expectedValue || 0),
+                stdDevs: Number(alertData.stdDevs || 0),
+                timestamp: alertData.timestamp || Date.now(),
+              };
+
+              // Persists until user manually clicks the ✕ close button
+              setActiveAlerts((prev) => [newAlert, ...prev].slice(0, 4));
+
               return;
             }
 
@@ -597,7 +622,56 @@ export default function DashboardOverview() {
 
   // Active state screen
   return (
-    <div className="space-y-8 select-none">
+    <div className="space-y-8 select-none relative">
+      {/* Real-time EWMA Anomaly Alerts Toast Stack */}
+      {activeAlerts.length > 0 && (
+        <div className="fixed top-6 right-6 z-50 space-y-3 max-w-md w-full pointer-events-none">
+          {activeAlerts.map((alert) => (
+            <div
+              key={alert.id}
+              className="pointer-events-auto bg-gradient-to-r from-zinc-950 via-rose-950/90 to-zinc-950 border border-rose-500/40 rounded-2xl p-4 shadow-2xl backdrop-blur-md text-white transition-all duration-300 transform translate-y-0 animate-in fade-in slide-in-from-top-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                  </span>
+                  <span className="text-xs font-extrabold tracking-wider text-rose-400 uppercase font-mono">
+                    Latency Anomaly Detected
+                  </span>
+                </div>
+                <button
+                  onClick={() => setActiveAlerts((prev) => prev.filter((a) => a.id !== alert.id))}
+                  className="text-zinc-400 hover:text-white transition-colors cursor-pointer text-xs p-1"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="mt-2 text-sm font-semibold text-zinc-100 flex items-center gap-2 font-mono">
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getMethodStyle(alert.method)}`}>
+                  {alert.method}
+                </span>
+                <span className="truncate">{alert.endpoint}</span>
+              </div>
+
+              <div className="mt-3 pt-2.5 border-t border-rose-500/20 flex items-center justify-between text-xs font-medium text-zinc-300">
+                <div>
+                  Observed: <span className="font-bold text-rose-400 font-mono">{alert.actualValue} ms</span>
+                </div>
+                <div>
+                  Baseline: <span className="font-bold text-zinc-400 font-mono">{alert.expectedValue} ms</span>
+                </div>
+                <div className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold font-mono border border-rose-500/30">
+                  +{alert.stdDevs}σ
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* 1. Welcome Banner */}
       <div className="bg-gradient-to-r from-zinc-900 to-indigo-950 rounded-2xl p-6 text-white shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
