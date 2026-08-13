@@ -1,7 +1,15 @@
+import os
+import sys
+
+# Ensure root directory (genAi-service) is in sys.path when running script directly
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from fastapi import FastAPI
 import uvicorn
+from app.routes.queryRoutes import router as query_router
 
 app = FastAPI(title="genai-service")
+app.include_router(query_router)
 
 
 @app.get("/health")
