@@ -22,16 +22,7 @@ def main() -> None:
 
         response = llm.invoke(prompt)
 
-        print("--- Response Received ---")
-        if isinstance(response.content, list):
-            clean_text = "".join(
-                item.get("text", "") if isinstance(item, dict) else str(item)
-                for item in response.content
-            )
-        else:
-            clean_text = str(response.content)
-
-        print(clean_text)
+        print(response.text)
 
     except Exception as e:
         error_type = type(e).__name__
