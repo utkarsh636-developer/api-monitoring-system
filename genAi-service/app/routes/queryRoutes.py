@@ -22,3 +22,23 @@ async def query_llm(request: QueryRequest) -> QueryResponse:
         raise HTTPException(
             status_code=500, detail=f"Failed to generate LLM response: {str(e)}"
         ) from e
+
+
+@router.get("/db-test")
+async def test_db_connection() -> dict:
+    conn = None
+    try:
+        from app.db import get_db_connection
+
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1;")
+            cursor.fetchone()
+        return {"db_status": "connected"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Database test failed: {str(e)}"
+        ) from e
+    finally:
+        if conn:
+            conn.close()

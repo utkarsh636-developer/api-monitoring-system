@@ -16,5 +16,11 @@ class Settings:
                 "Please set GEMINI_API_KEY in your .env file."
             )
 
+        if not self.DATABASE_URL:
+            raise ValueError(
+                "CRITICAL: DATABASE_URL is missing! "
+                "Please set DATABASE_URL in your .env file."
+            )
+
 
 settings = Settings()
