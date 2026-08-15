@@ -288,27 +288,11 @@ export class DashboardWsServer {
             // Backpressure guard: if the client's send buffer is congested, force-close
             // the socket with application close code 4000 ("Buffer overflow — resync required")
             // instead of silently dropping the frame.
-            //
-            // WHY force-close instead of silent drop?
-            //   Silent drop leaves the client's in-memory KPI counters diverging from
-            //   reality with no signal to recover. Force-closing with code 4000 gives
-            //   the frontend an explicit, deterministic trigger to re-fetch a
-            //   ground-truth snapshot from PostgreSQL before resuming the live stream.
-            //
-            // WHY 16 KB?
-            //   Each metric event is ~150-200 bytes. 16 KB allows ~80-100 queued frames
-            //   before declaring a client too slow. It aligns with Linux TCP kernel buffer
-            //   boundaries (sk_buff), so frames below this threshold live in kernel space,
-            //   not Node.js heap. Above 32 KB, 1,000 slow clients would consume 32+ MB of
-            //   server RAM in unsent queued frames.
             if (ws.bufferedAmount > BACKPRESSURE_THRESHOLD_BYTES) {
                 logger.warn('[DashboardWS] Client buffer full — force-closing socket to trigger resync', {
                     bufferedAmount: ws.bufferedAmount,
                     threshold: BACKPRESSURE_THRESHOLD_BYTES,
                 });
-                // Close code 4000: user-defined application-level code.
-                // Frontend can distinguish this from normal close (1000) or server error (1011)
-                // and knows to re-fetch the snapshot before re-opening the stream.
                 ws.close(4000, 'Buffer overflow — resync required');
                 this.clients.delete(ws);
                 continue;

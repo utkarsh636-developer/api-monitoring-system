@@ -6,10 +6,10 @@ export const LIVE_ALERTS_CHANNEL = 'alerts:live';
 export interface AlertEvent {
     endpoint: string;
     method: string;
-    actualValue: number;     // The observed latencyMs that triggered the alert
-    expectedValue: number;   // The EWMA mean at the moment of detection
-    stdDevs: number;         // How many standard deviations above the mean
-    timestamp: number;       // Unix ms — taken directly from the originating MetricEvent
+    actualValue: number;     
+    expectedValue: number;   
+    stdDevs: number;         
+    timestamp: number;       
 }
 
 class LiveAlertsPublisher {
