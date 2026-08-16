@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.services.llmService import get_llm_response
+from app.services.llmService import get_llm_response, query_metrics_with_llm
 
 router = APIRouter()
 
@@ -13,6 +13,11 @@ class QueryResponse(BaseModel):
     response: str
 
 
+class NLQueryRequest(BaseModel):
+    prompt: str
+    client_id: str
+
+
 @router.post("/query", response_model=QueryResponse)
 async def query_llm(request: QueryRequest) -> QueryResponse:
     try:
@@ -21,6 +26,20 @@ async def query_llm(request: QueryRequest) -> QueryResponse:
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to generate LLM response: {str(e)}"
+        ) from e
+
+
+@router.post("/nl-query", response_model=QueryResponse)
+async def nl_query(request: NLQueryRequest) -> QueryResponse:
+    try:
+        result = query_metrics_with_llm(
+            user_prompt=request.prompt,
+            client_id=request.client_id,
+        )
+        return QueryResponse(response=result)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"NL query failed: {str(e)}"
         ) from e
 
 
