@@ -43,7 +43,16 @@ const config = {
         secure: process.env.NODE_ENV === "production",
         sameSite: (process.env.NODE_ENV === "production" ? "none" : "lax") as "none" | "lax",
         expiresIn: 24 * 60 * 60 * 1000
-    }
+    },
+
+    genai: {
+        // URL of the internal FastAPI GenAI microservice
+        serviceUrl: process.env.GENAI_SERVICE_URL || 'http://localhost:8000',
+        // ⚠️  SYNC REQUIRED: This MUST match INTERNAL_SERVICE_KEY in genAi-service/.env exactly.
+        //     Set the same random secret in both places. Use:
+        //     node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+        internalServiceKey: process.env.GENAI_INTERNAL_KEY || '',
+    },
 }
 
 export default config;

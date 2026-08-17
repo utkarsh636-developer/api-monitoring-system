@@ -92,6 +92,10 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379
+      # GenAI service — uses Docker service name 'genai-service' as hostname
+      GENAI_SERVICE_URL: http://genai-service:8000
+      # ⚠️  SYNC: Must match INTERNAL_SERVICE_KEY in genAi-service/.env
+      GENAI_INTERNAL_KEY: ${GENAI_INTERNAL_KEY:-changeme_generate_a_real_secret}
     volumes:
       - ./backend/logs:/app/logs
     networks:
@@ -101,6 +105,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      genai-service:
+        condition: service_started
     restart: unless-stopped
 
   consumer:
@@ -161,6 +167,26 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    restart: unless-stopped
+
+  genai-service:
+    build:
+      context: ./genAi-service
+      dockerfile: Dockerfile
+    container_name: api-monitoring-genai
+    ports:
+      - "8000:8000"
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      # Uses pre-encoded URL so psycopg2 correctly parses the password containing '@'
+      DATABASE_URL: ${DOCKER_DATABASE_URL}
+      # ⚠️  SYNC: Must match GENAI_INTERNAL_KEY in backend env / root .env
+      INTERNAL_SERVICE_KEY: ${GENAI_INTERNAL_KEY:-changeme_generate_a_real_secret}
+    networks:
+      - api-monitoring-network
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:

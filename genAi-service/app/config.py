@@ -9,6 +9,7 @@ class Settings:
         self.GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "").strip()
         self.ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "").strip()
         self.DATABASE_URL: str = os.getenv("DATABASE_URL", "").strip()
+        self.INTERNAL_SERVICE_KEY: str = os.getenv("INTERNAL_SERVICE_KEY", "").strip()
 
         if not self.GEMINI_API_KEY and not self.ANTHROPIC_API_KEY:
             raise ValueError(
@@ -20,6 +21,12 @@ class Settings:
             raise ValueError(
                 "CRITICAL: DATABASE_URL is missing! "
                 "Please set DATABASE_URL in your .env file."
+            )
+
+        if not self.INTERNAL_SERVICE_KEY:
+            raise ValueError(
+                "CRITICAL: INTERNAL_SERVICE_KEY is missing! "
+                "Generate a random secret and set it in your .env file."
             )
 
 
