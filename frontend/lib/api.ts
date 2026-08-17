@@ -285,4 +285,16 @@ export const clientApi = {
     },
 };
 
+export const genaiApi = {
+    /**
+     * Sends a natural-language question to the GenAI metrics service.
+     * Auth is handled automatically via the httpOnly cookie (same as all other api calls).
+     * Returns the plain-text response string.
+     */
+    queryMetricsNL: async (prompt: string): Promise<string> => {
+        const response = await api.post<ApiResponse<{ response: string }>>('/genai/query', { prompt });
+        return response.data?.data?.response ?? '';
+    },
+};
+
 export default api;

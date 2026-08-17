@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDashboard } from './layout';
 import MetricCard from '../../components/MetricCard';
+import GenAIQueryBox from '../../components/GenAIQueryBox';
 import { analyticsApi, DashboardData } from '../../lib/api';
 import {
   ResponsiveContainer,
@@ -786,6 +787,9 @@ export default function DashboardOverview() {
           description="monitored endpoints"
         />
       </div>
+
+      {/* GenAI Natural Language Query Box */}
+      <GenAIQueryBox />
 
       {/* 3. Bento Grid - Multi-column widgets */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
