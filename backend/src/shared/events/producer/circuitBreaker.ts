@@ -16,17 +16,6 @@ export interface CircuitBreakerOptions {
     };
 }
 
-/**
- * A simple implementation of the Circuit Breaker pattern in TypeScript. This class allows you to wrap calls to external services and automatically handle failures by opening the circuit after a certain number of consecutive failures, and then allowing a limited number of test requests after a cooldown period to determine if the service has recovered.
- * 
- * Usage:
- * const circuitBreaker = new CircuitBreaker({ failureThreshold: 5, cooldownMs: 30000 })
- * circuitBreaker.allowRequest() // returns true if request is allowed, false if circuit is open
- * circuitBreaker.onSuccess() // call this when a request succeeds
- * circuitBreaker.onFailure() // call this when a request fails
- * 
- * The circuit breaker will automatically transition between states (CLOSED, OPEN, HALFOPEN) based on the success and failure of requests, and will log state changes and metrics for monitoring purposes.
- */
 export class CircuitBreaker {
     private failureThreshold: number;
     private cooldownMs: number;
@@ -39,10 +28,6 @@ export class CircuitBreaker {
     private halfOpenAttempts: number;
     private halfOpenSuccesses: number;
 
-    /**
-     * Creates a new CircuitBreaker instance with the specified options.
-     * @param {CircuitBreakerOptions} [opts] - Configuration options for the circuit breaker.
-     */
     constructor(opts: CircuitBreakerOptions = {}) {
         this.failureThreshold = opts.failureThreshold ?? 5;
         this.cooldownMs = opts.cooldownMs ?? 30000;
@@ -64,18 +49,10 @@ export class CircuitBreaker {
         return this._state;
     }
 
-    /**
-     * Checks if the cooldown period has elapsed since the last failure.
-     * @returns {boolean} True if the cooldown period has elapsed, false otherwise.
-     */
     private cooldownElapsed(): boolean {
         return Date.now() - this.lastFailureTime >= this.cooldownMs;
     }
 
-    /**
-     * Transitions the circuit breaker to a new state.
-     * @param {CircuitState} newState - The new state to transition to.
-     */
     private transitionTo(newState: CircuitState): void {
         const prev = this._state;
         this._state = newState;
@@ -89,9 +66,6 @@ export class CircuitBreaker {
         }
     }
 
-    /**
-     * Opens the circuit, preventing further requests from being allowed until the cooldown period has elapsed. This method is called when the failure threshold is reached or when a test request in the HALFOPEN state fails.
-     */
     private openCircuit(): void {
         this.lastFailureTime = Date.now();
         this.transitionTo(CircuitState.OPEN);
@@ -101,9 +75,6 @@ export class CircuitBreaker {
         });
     }
 
-    /**
-     * Resets the circuit breaker to the CLOSED state, allowing requests to be processed normally. This method is called when a test request in the HALFOPEN state succeeds or can be called manually for debugging purposes.
-     */
     private reset(): void {
         this._state = CircuitState.CLOSED;
         this.failures = 0;
@@ -112,10 +83,6 @@ export class CircuitBreaker {
         this.logger.info('[CircuitBreaker] HALF_OPEN => CLOSED');
     }
 
-    /**
-     * Determines if a request is allowed based on the current state of the circuit breaker.
-     * @returns {boolean} True if the request is allowed, false otherwise.
-     */
     public allowRequest(): boolean {
         const current = this.state;
 
@@ -127,7 +94,6 @@ export class CircuitBreaker {
             failures: this.failures
         });
 
-        // In CLOSED state, all requests are allowed. 
         if (current === CircuitState.CLOSED) return true;
 
         // In OPEN state, no requests are allowed until cooldown has elapsed, then it transitions to HALFOPEN.
@@ -175,9 +141,6 @@ export class CircuitBreaker {
         }
     }
 
-    /**
-     * Records a failed request. If the circuit breaker is in the HALFOPEN state, it immediately transitions back to OPEN. If the circuit breaker is in the CLOSED state, it increments the failure count and opens the circuit if the failure threshold is reached.
-     */
     public onFailure(): void {
         this.logger.error('[CircuitBreaker] failure recorded', {
             state: this.state,
@@ -201,9 +164,6 @@ export class CircuitBreaker {
         }
     }
 
-    /**
-     * Returns a snapshot of the current state of the circuit breaker.
-     */
     public snapshot(): {
         state: CircuitState;
         failures: number;
